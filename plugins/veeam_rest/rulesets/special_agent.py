@@ -15,7 +15,6 @@ from cmk.rulesets.v1.form_specs import (
     MultipleChoice,
     MultipleChoiceElement,
     Password,
-    String,
     TimeMagnitude,
     TimeSpan,
     migrate_to_password,
@@ -34,16 +33,6 @@ def _parameter_form() -> Dictionary:
         ),
         elements={
             # Connection settings
-            "hostname": DictElement(
-                required=False,
-                parameter_form=String(
-                    title=Title("Veeam Server Hostname"),
-                    help_text=Help(
-                        "Hostname or IP address of the Veeam B&R server. "
-                        "If not specified, the host address is used."
-                    ),
-                ),
-            ),
             "port": DictElement(
                 required=False,
                 parameter_form=Integer(

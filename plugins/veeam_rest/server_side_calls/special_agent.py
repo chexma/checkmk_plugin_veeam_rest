@@ -32,9 +32,8 @@ def _agent_arguments(
     """
     args: list[str] = []
 
-    # Connection settings
-    hostname = params.get("hostname") or host_config.primary_ip_config.address
-    args.extend(["--hostname", hostname])
+    # Connection settings - always use the Checkmk host's address
+    args.extend(["--hostname", host_config.primary_ip_config.address])
 
     if "port" in params:
         args.extend(["--port", str(params["port"])])
