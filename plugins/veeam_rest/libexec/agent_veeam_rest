@@ -11,9 +11,14 @@ https://helpcenter.veeam.com/references/vbr/13/rest/1.3-rev1/tag/SectionOverview
 
 import argparse
 import json
+import logging
 import sys
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Any
+
+# Logger instance - configured in main()
+logger = logging.getLogger("agent_veeam_rest")
 
 try:
     import requests
@@ -184,8 +189,10 @@ class VeeamRestAPI:
     def _authenticate(self, username: str, password: str) -> None:
         """Acquire OAuth2 access token using password grant."""
         url = f"{self.base_url}/api/oauth2/token"
+        logger.info("Authenticating to %s", self.base_url)
 
         try:
+            start_time = time.time()
             response = self.session.post(
                 url,
                 data={
@@ -201,6 +208,8 @@ class VeeamRestAPI:
                 timeout=self.timeout,
             )
             response.raise_for_status()
+            elapsed = (time.time() - start_time) * 1000
+            logger.debug("Authentication request took %.0fms", elapsed)
             token_data = response.json()
             access_token = token_data["access_token"]
             self.session.headers.update({
@@ -208,6 +217,7 @@ class VeeamRestAPI:
                 "x-api-version": self.API_VERSION,
                 "Accept": "application/json",
             })
+            logger.info("Authentication successful")
         except requests.exceptions.SSLError as e:
             raise VeeamAPIError(f"SSL Error: {e}")
         except requests.exceptions.ConnectionError as e:
@@ -222,8 +232,10 @@ class VeeamRestAPI:
     def _get(self, endpoint: str, params: dict | None = None) -> Any:
         """Make authenticated GET request."""
         url = f"{self.base_url}{endpoint}"
+        logger.info("GET %s", endpoint)
 
         try:
+            start_time = time.time()
             response = self.session.get(
                 url,
                 params=params,
@@ -231,6 +243,8 @@ class VeeamRestAPI:
                 timeout=self.timeout,
             )
             response.raise_for_status()
+            elapsed = (time.time() - start_time) * 1000
+            logger.debug("Request took %.0fms", elapsed)
             return response.json()
         except requests.exceptions.SSLError as e:
             raise VeeamAPIError(f"SSL Error: {e}")
@@ -259,12 +273,14 @@ class VeeamRestAPI:
 
             pagination = response.get("pagination", {})
             total = pagination.get("total", len(data))
+            logger.debug("Pagination: skip=%d, limit=%d, total=%d", skip, limit, total)
 
             if skip + len(data) >= total or not data:
                 break
 
             skip += limit
 
+        logger.info("Found %d items from %s", len(all_items), endpoint)
         return all_items
 
     # -------------------------------------------------------------------------
@@ -445,9 +461,15 @@ def parse_arguments() -> argparse.Namespace:
         help="Max session/task age in seconds (default: 86400 = 24h)"
     )
     parser.add_argument(
+        "-v", "--verbose",
+        action="count",
+        default=0,
+        help="Increase verbosity (-v, -vv, -vvv)"
+    )
+    parser.add_argument(
         "--debug",
         action="store_true",
-        help="Enable debug output"
+        help="Show Python stack traces on errors"
     )
     parser.add_argument(
         "--redact",
@@ -460,6 +482,22 @@ def parse_arguments() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_arguments()
+
+    # Configure logging based on verbosity
+    if args.verbose >= 3:
+        log_level = logging.DEBUG
+    elif args.verbose == 2:
+        log_level = logging.INFO
+    elif args.verbose == 1:
+        log_level = logging.WARNING
+    else:
+        log_level = logging.CRITICAL  # Silent by default
+
+    logging.basicConfig(
+        level=log_level,
+        format="%(asctime)s %(levelname)s %(message)s",
+        stream=sys.stderr,
+    )
 
     # Create redactor if --redact flag is set
     redactor = VeeamRedactor() if args.redact else None
@@ -475,17 +513,28 @@ def main() -> int:
             timeout=args.timeout,
         )
 
+        # Track errors for partial failure handling
+        errors: list[tuple[str, str]] = []
+
+        logger.warning("Collecting %d sections...", len(args.sections))
+
         # Get server info for enrichment
         server_name = args.hostname
-        if "server" in args.sections or args.debug:
+        if "server" in args.sections:
             try:
                 server_info = api.get_server_info()
                 server_name = server_info.get("backupServerName", args.hostname)
-                if "server" in args.sections:
-                    output_section("server", server_info, redactor)
+                output_section("server", server_info, redactor)
             except VeeamAPIError as e:
-                if args.debug:
-                    sys.stderr.write(f"Warning: Could not get server info: {e}\n")
+                errors.append(("server", str(e)))
+                logger.warning("Section 'server' failed: %s", e)
+        else:
+            # Try to get server name for enrichment even if not collecting server section
+            try:
+                server_info = api.get_server_info()
+                server_name = server_info.get("backupServerName", args.hostname)
+            except VeeamAPIError:
+                pass  # Use hostname as fallback
 
         # Calculate time filter for sessions/tasks
         created_after = None
@@ -494,47 +543,89 @@ def main() -> int:
                 datetime.now(timezone.utc) - timedelta(seconds=args.session_age)
             ).isoformat()
 
-        # Collect and output sections
+        # Collect and output sections - continue on failure
         if "jobs" in args.sections:
-            jobs = api.get_job_states()
-            jobs = enrich_job_data(jobs, server_name)
-            output_section("jobs", jobs, redactor)
+            try:
+                jobs = api.get_job_states()
+                jobs = enrich_job_data(jobs, server_name)
+                output_section("jobs", jobs, redactor)
+            except VeeamAPIError as e:
+                errors.append(("jobs", str(e)))
+                logger.warning("Section 'jobs' failed: %s", e)
 
         if "tasks" in args.sections:
-            tasks = api.get_task_sessions(created_after)
-            tasks = enrich_task_data(tasks, server_name)
-            output_section("tasks", tasks, redactor)
+            try:
+                tasks = api.get_task_sessions(created_after)
+                tasks = enrich_task_data(tasks, server_name)
+                output_section("tasks", tasks, redactor)
+            except VeeamAPIError as e:
+                errors.append(("tasks", str(e)))
+                logger.warning("Section 'tasks' failed: %s", e)
 
         if "sessions" in args.sections:
-            sessions = api.get_sessions(created_after)
-            output_section("sessions", sessions, redactor)
+            try:
+                sessions = api.get_sessions(created_after)
+                output_section("sessions", sessions, redactor)
+            except VeeamAPIError as e:
+                errors.append(("sessions", str(e)))
+                logger.warning("Section 'sessions' failed: %s", e)
 
         if "repositories" in args.sections:
-            repos = api.get_repository_states()
-            output_section("repositories", repos, redactor)
+            try:
+                repos = api.get_repository_states()
+                output_section("repositories", repos, redactor)
+            except VeeamAPIError as e:
+                errors.append(("repositories", str(e)))
+                logger.warning("Section 'repositories' failed: %s", e)
 
         if "proxies" in args.sections:
-            proxies = api.get_proxy_states()
-            output_section("proxies", proxies, redactor)
+            try:
+                proxies = api.get_proxy_states()
+                output_section("proxies", proxies, redactor)
+            except VeeamAPIError as e:
+                errors.append(("proxies", str(e)))
+                logger.warning("Section 'proxies' failed: %s", e)
 
         if "managed_servers" in args.sections:
-            servers = api.get_managed_servers()
-            output_section("managed_servers", servers, redactor)
+            try:
+                servers = api.get_managed_servers()
+                output_section("managed_servers", servers, redactor)
+            except VeeamAPIError as e:
+                errors.append(("managed_servers", str(e)))
+                logger.warning("Section 'managed_servers' failed: %s", e)
 
         if "license" in args.sections:
-            license_info = api.get_license()
-            output_section("license", license_info, redactor)
+            try:
+                license_info = api.get_license()
+                output_section("license", license_info, redactor)
+            except VeeamAPIError as e:
+                errors.append(("license", str(e)))
+                logger.warning("Section 'license' failed: %s", e)
 
         if "scaleout_repositories" in args.sections:
-            scaleout_repos = api.get_scaleout_repositories()
-            output_section("scaleout_repositories", scaleout_repos, redactor)
+            try:
+                scaleout_repos = api.get_scaleout_repositories()
+                output_section("scaleout_repositories", scaleout_repos, redactor)
+            except VeeamAPIError as e:
+                errors.append(("scaleout_repositories", str(e)))
+                logger.warning("Section 'scaleout_repositories' failed: %s", e)
 
         if "wan_accelerators" in args.sections:
-            wan_accelerators = api.get_wan_accelerators()
-            output_section("wan_accelerators", wan_accelerators, redactor)
+            try:
+                wan_accelerators = api.get_wan_accelerators()
+                output_section("wan_accelerators", wan_accelerators, redactor)
+            except VeeamAPIError as e:
+                errors.append(("wan_accelerators", str(e)))
+                logger.warning("Section 'wan_accelerators' failed: %s", e)
+
+        # Output error section if any sections failed
+        if errors:
+            error_data = [{"section": s, "error": e} for s, e in errors]
+            output_section("errors", error_data, redactor)
+            logger.warning("Completed with %d section failures", len(errors))
 
     except VeeamAPIError as e:
-        # Output error section so check plugin can report it
+        # Authentication or critical API error
         print("<<<veeam_rest_error>>>")
         print(str(e))
         sys.stderr.write(f"Error: {e}\n")
