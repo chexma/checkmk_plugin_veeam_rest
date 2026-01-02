@@ -31,11 +31,11 @@ omd restart apache
 
 ```bash
 # Standard collection
-./agent_veeam_rest --hostname 192.168.1.1 --username 'DOMAIN\admin' \
+./agent_veeam_rest --hostname 192.168.1.1 --username '.\user' \
     --password secret --no-cert-check
 
 # Redacted output for safe sharing
-./agent_veeam_rest --hostname 192.168.1.1 --username 'DOMAIN\admin' \
+./agent_veeam_rest --hostname 192.168.1.1 --username '.\user' \
     --password secret --no-cert-check --redact
 ```
 
