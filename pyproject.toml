@@ -1,0 +1,77 @@
+[project]
+name = "veeam-rest"
+version = "0.0.1"
+description = "CheckMK plugin for Veaam Backup & Replication"
+authors = [
+    { name = "Andre Eckstein", email = "chexma@gmx.de" }
+]
+requires-python = ">=3.12"
+
+[tool.black]
+line-length = 100
+target-version = ["py312"]
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.git
+    | \.vscode
+    | \.devcontainer
+    | __pycache__
+    | \.pytest_cache
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 100
+known_first_party = ["cmk_addons"]
+known_third_party = ["cmk", "pydantic", "requests"]
+sections = ["FUTURE", "STDLIB", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
+skip = [".git", ".vscode", ".devcontainer", "__pycache__"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
+
+[tool.flake8]
+max-line-length = 100
+extend-ignore = ["E203", "W503"]
+exclude = [
+    ".git",
+    ".vscode",
+    ".devcontainer",
+    "__pycache__",
+    ".pytest_cache",
+]
+per-file-ignores = [
+    "__init__.py:F401",
+]
+
+[tool.pylint.messages_control]
+disable = [
+    "C0114",  # missing-module-docstring
+    "C0115",  # missing-class-docstring
+    "C0116",  # missing-function-docstring
+    "R0903",  # too-few-public-methods
+]
+
+[tool.pylint.format]
+max-line-length = 100
+
+[tool.pyright]
+pythonVersion = "3.12"
+pythonPlatform = "Linux"
+typeCheckingMode = "basic"
+reportMissingImports = "warning"
+reportMissingTypeStubs = "none"
+extraPaths = [
+    "/omd/sites/cmk/lib/python3",
+    "/omd/sites/cmk/lib/python3/cmk",
+    "/omd/sites/cmk/local/lib/python3",
+    "/omd/sites/cmk/local/lib/python3/cmk_addons/plugins"
+]

@@ -1,0 +1,28 @@
+title: Veeam License
+agents: veeam_rest
+catalog: app/veeam
+license: GPLv2
+distribution: check_mk
+description:
+ This check monitors the Veeam Backup & Replication license status via the REST API.
+
+ It reports:
+ - License status (Valid, Invalid, Expired)
+ - License expiration date and days remaining
+ - Support contract expiration
+ - Instance license usage and utilization percentage
+ - Socket and capacity license usage (if applicable)
+
+ The check returns:
+ - OK: License is valid and not expiring soon
+ - WARN: License or support contract expiring within threshold (default: 30 days)
+ - WARN: Instance usage exceeds warning threshold (default: 80%)
+ - CRIT: License invalid or expired
+ - CRIT: License expiring within critical threshold (default: 7 days)
+ - CRIT: Instance usage exceeds critical threshold (default: 95%)
+
+ Configurable thresholds for license expiration, support expiration,
+ and instance usage levels.
+
+discovery:
+ One service is created for the Veeam license.

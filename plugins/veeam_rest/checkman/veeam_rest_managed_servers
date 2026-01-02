@@ -1,0 +1,26 @@
+title: Veeam Managed Servers
+agents: veeam_rest
+catalog: app/veeam
+license: GPLv2
+distribution: check_mk
+description:
+ This check monitors Veeam managed server status via the REST API.
+
+ Managed servers include:
+ - VMware vCenter and ESXi hosts
+ - Microsoft Hyper-V hosts and clusters
+ - System Center VMM
+ - Windows and Linux hosts
+ - SMB file servers
+
+ The check returns:
+ - OK: Server is available
+ - WARN: Server is in maintenance mode or has warnings
+ - CRIT: Server is unavailable, inaccessible, or offline
+ - UNKNOWN: No data or server not found
+
+item:
+ The server name
+
+discovery:
+ One service is created for each managed server.

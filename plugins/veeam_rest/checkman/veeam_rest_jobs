@@ -1,0 +1,24 @@
+title: Veeam Backup Jobs
+agents: veeam_rest
+catalog: app/veeam
+license: GPLv2
+distribution: check_mk
+description:
+ This check monitors Veeam Backup & Replication jobs via the REST API.
+
+ It reports the job status, last result, and schedule information.
+
+ The check returns:
+ - OK: Job completed successfully
+ - WARN: Job completed with warnings, or job is disabled
+ - CRIT: Job failed
+ - UNKNOWN: No data or job not found
+
+ Optional parameters allow alerting on disabled jobs and
+ maximum age of the last successful run.
+
+item:
+ The job name
+
+discovery:
+ One service is created for each backup job.

@@ -1,0 +1,28 @@
+title: Veeam Backup Tasks (Per-VM Details)
+agents: veeam_rest
+catalog: app/veeam
+license: GPLv2
+distribution: check_mk
+description:
+ This check monitors individual Veeam backup task sessions via the REST API.
+
+ Each task represents a VM or object being backed up, providing detailed
+ performance metrics including:
+ - Backup duration
+ - Data processed, read, and transferred
+ - Processing speed and bottleneck information
+ - Backup age
+
+ The check returns:
+ - OK: Backup completed successfully
+ - WARN: Backup completed with warnings, or exceeded age/duration thresholds
+ - CRIT: Backup failed
+ - UNKNOWN: No data or task not found
+
+ This check replaces the veeam_client section from the PowerShell plugin.
+
+item:
+ The object name (VM, file share, etc.)
+
+discovery:
+ One service is created for each unique backup object.

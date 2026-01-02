@@ -1,0 +1,25 @@
+title: Veeam Scale-Out Repositories
+agents: veeam_rest
+catalog: app/veeam
+license: GPLv2
+distribution: check_mk
+description:
+ This check monitors Veeam Scale-Out Backup Repositories (SOBR) via the REST API.
+
+ It reports:
+ - Number of performance extents and their health status
+ - Extent status (Normal, Sealed, Maintenance, Evacuate, etc.)
+ - Capacity tier status (enabled/disabled, offload status)
+ - Archive tier status
+ - Placement policy type
+
+ The check returns:
+ - OK: All extents are healthy
+ - WARN: Extents in Maintenance, Evacuate, or ResyncRequired state
+ - WARN: No performance extents configured
+
+discovery:
+ One service is created for each scale-out backup repository.
+
+item:
+ The scale-out repository name

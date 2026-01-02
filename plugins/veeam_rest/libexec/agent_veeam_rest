@@ -1,0 +1,554 @@
+#!/usr/bin/env python3
+"""
+Veeam Backup & Replication REST API Special Agent for Checkmk
+
+This agent connects to the Veeam B&R REST API and collects monitoring data
+for backup jobs, task sessions, repositories, proxies, and managed servers.
+
+API Documentation:
+https://helpcenter.veeam.com/references/vbr/13/rest/1.3-rev1/tag/SectionOverview
+"""
+
+import argparse
+import json
+import sys
+from datetime import datetime, timedelta, timezone
+from typing import Any
+
+try:
+    import requests
+except ImportError:
+    sys.stderr.write("Error: 'requests' module is required\n")
+    sys.exit(2)
+
+try:
+    import urllib3
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+except ImportError:
+    pass
+
+
+# =============================================================================
+# REDACTION
+# =============================================================================
+
+
+class VeeamRedactor:
+    """Redacts sensitive fields while maintaining consistency across all data.
+
+    Same values are always redacted to the same placeholder, preserving
+    relationships in the data (e.g., same hostname always becomes HOST_1).
+
+    To add new fields to redact, simply add them to REDACT_FIELDS.
+    """
+
+    # Centralized configuration - easy to maintain
+    # Format: field_name -> replacement prefix
+    REDACT_FIELDS = {
+        # Names
+        "name": "NAME",
+        "hostName": "HOST",
+        "repositoryName": "REPO",
+        "backupServer": "SERVER",
+        "backupServerName": "SERVER",
+        "componentName": "COMPONENT",
+        "membership": "SOBR",
+        # Paths
+        "path": "PATH",
+        "cacheFolder": "PATH",
+        # Identifiers
+        "id": "ID",
+        "vbrId": "VBRID",
+        "hostId": "HOSTID",
+        "proxyId": "PROXYID",
+        "repositoryId": "REPOID",
+        "serverId": "SERVERID",
+        "backupId": "BACKUPID",
+        "sessionId": "SESSIONID",
+        "parentSessionId": "SESSIONID",
+        "objectId": "OBJID",
+        # License & credentials
+        "licensedTo": "ORG",
+        "supportId": "SUPPORT",
+        # Network
+        "serverIps": "IP",
+        # Descriptions (may contain sensitive info)
+        "description": "DESC",
+    }
+
+    def __init__(self):
+        self._mappings: dict[str, str] = {}  # original value -> redacted placeholder
+        self._counter: int = 0  # global counter for unique IDs
+
+    def _get_redacted(self, prefix: str, value: str) -> str:
+        """Get consistent redacted value for a given original value.
+
+        Same values always map to the same placeholder, regardless of which
+        field they appear in. This preserves relationships in the data.
+        """
+        if not value or value in ("", None):
+            return value
+
+        # Check if we've seen this exact value before (any field)
+        if value in self._mappings:
+            return self._mappings[value]
+
+        # Generate new placeholder with global counter
+        self._counter += 1
+        redacted = f"{prefix}_{self._counter}"
+
+        # Cache the mapping by value only (not field-specific)
+        self._mappings[value] = redacted
+        return redacted
+
+    def redact_value(self, field_name: str, value: Any) -> Any:
+        """Redact a single value if field is in REDACT_FIELDS."""
+        if field_name not in self.REDACT_FIELDS:
+            return value
+
+        prefix = self.REDACT_FIELDS[field_name]
+
+        # Handle lists (e.g., serverIps)
+        if isinstance(value, list):
+            return [self._get_redacted(prefix, str(v)) for v in value]
+
+        # Handle strings
+        if isinstance(value, str):
+            return self._get_redacted(prefix, value)
+
+        return value
+
+    def redact_dict(self, data: dict) -> dict:
+        """Recursively redact all sensitive fields in a dict."""
+        result = {}
+        for key, value in data.items():
+            if isinstance(value, dict):
+                result[key] = self.redact_dict(value)
+            elif isinstance(value, list):
+                result[key] = self.redact_list(value)
+            else:
+                result[key] = self.redact_value(key, value)
+        return result
+
+    def redact_list(self, data: list) -> list:
+        """Recursively redact all sensitive fields in a list."""
+        result = []
+        for item in data:
+            if isinstance(item, dict):
+                result.append(self.redact_dict(item))
+            elif isinstance(item, list):
+                result.append(self.redact_list(item))
+            else:
+                result.append(item)
+        return result
+
+    def redact(self, data: Any) -> Any:
+        """Redact sensitive fields from any data structure."""
+        if isinstance(data, dict):
+            return self.redact_dict(data)
+        elif isinstance(data, list):
+            return self.redact_list(data)
+        return data
+
+
+# =============================================================================
+# API CLIENT
+# =============================================================================
+
+
+class VeeamAPIError(Exception):
+    """Custom exception for Veeam API errors."""
+    pass
+
+
+class VeeamRestAPI:
+    """Veeam Backup & Replication REST API client with OAuth2 authentication."""
+
+    API_VERSION = "1.3-rev1"
+
+    def __init__(
+        self,
+        hostname: str,
+        port: int,
+        username: str,
+        password: str,
+        verify_ssl: bool = True,
+        timeout: int = 60,
+    ):
+        self.base_url = f"https://{hostname}:{port}"
+        self.verify_ssl = verify_ssl
+        self.timeout = timeout
+        self.session = requests.Session()
+        self._authenticate(username, password)
+
+    def _authenticate(self, username: str, password: str) -> None:
+        """Acquire OAuth2 access token using password grant."""
+        url = f"{self.base_url}/api/oauth2/token"
+
+        try:
+            response = self.session.post(
+                url,
+                data={
+                    "grant_type": "password",
+                    "username": username,
+                    "password": password,
+                },
+                headers={
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "x-api-version": self.API_VERSION,
+                },
+                verify=self.verify_ssl,
+                timeout=self.timeout,
+            )
+            response.raise_for_status()
+            token_data = response.json()
+            access_token = token_data["access_token"]
+            self.session.headers.update({
+                "Authorization": f"Bearer {access_token}",
+                "x-api-version": self.API_VERSION,
+                "Accept": "application/json",
+            })
+        except requests.exceptions.SSLError as e:
+            raise VeeamAPIError(f"SSL Error: {e}")
+        except requests.exceptions.ConnectionError as e:
+            raise VeeamAPIError(f"Connection Error: {e}")
+        except requests.exceptions.Timeout:
+            raise VeeamAPIError(f"Timeout during authentication")
+        except requests.exceptions.HTTPError as e:
+            raise VeeamAPIError(f"Authentication failed: {e}")
+        except (KeyError, json.JSONDecodeError) as e:
+            raise VeeamAPIError(f"Invalid authentication response: {e}")
+
+    def _get(self, endpoint: str, params: dict | None = None) -> Any:
+        """Make authenticated GET request."""
+        url = f"{self.base_url}{endpoint}"
+
+        try:
+            response = self.session.get(
+                url,
+                params=params,
+                verify=self.verify_ssl,
+                timeout=self.timeout,
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.SSLError as e:
+            raise VeeamAPIError(f"SSL Error: {e}")
+        except requests.exceptions.ConnectionError as e:
+            raise VeeamAPIError(f"Connection Error: {e}")
+        except requests.exceptions.Timeout:
+            raise VeeamAPIError(f"Request timeout for {endpoint}")
+        except requests.exceptions.HTTPError as e:
+            raise VeeamAPIError(f"HTTP Error for {endpoint}: {e}")
+        except json.JSONDecodeError:
+            raise VeeamAPIError(f"Invalid JSON response from {endpoint}")
+
+    def _get_paginated(self, endpoint: str, params: dict | None = None, limit: int = 500) -> list[dict]:
+        """Get all items from a paginated endpoint."""
+        all_items = []
+        skip = 0
+        request_params = params.copy() if params else {}
+
+        while True:
+            request_params["skip"] = skip
+            request_params["limit"] = limit
+
+            response = self._get(endpoint, request_params)
+            data = response.get("data", [])
+            all_items.extend(data)
+
+            pagination = response.get("pagination", {})
+            total = pagination.get("total", len(data))
+
+            if skip + len(data) >= total or not data:
+                break
+
+            skip += limit
+
+        return all_items
+
+    # -------------------------------------------------------------------------
+    # API Methods
+    # -------------------------------------------------------------------------
+
+    def get_server_info(self) -> dict:
+        """Get backup server information."""
+        return self._get("/api/v1/serverInfo")
+
+    def get_job_states(self) -> list[dict]:
+        """Get all job states."""
+        return self._get_paginated("/api/v1/jobs/states")
+
+    def get_sessions(self, created_after: str | None = None) -> list[dict]:
+        """Get sessions, optionally filtered by creation time."""
+        params = {}
+        if created_after:
+            params["createdAfterFilter"] = created_after
+        return self._get_paginated("/api/v1/sessions", params)
+
+    def get_task_sessions(self, created_after: str | None = None) -> list[dict]:
+        """Get task sessions with performance details."""
+        params = {}
+        if created_after:
+            params["createdAfterFilter"] = created_after
+        return self._get_paginated("/api/v1/taskSessions", params)
+
+    def get_repository_states(self) -> list[dict]:
+        """Get all repository states."""
+        return self._get_paginated("/api/v1/backupInfrastructure/repositories/states")
+
+    def get_proxy_states(self) -> list[dict]:
+        """Get all proxy states."""
+        return self._get_paginated("/api/v1/backupInfrastructure/proxies/states")
+
+    def get_managed_servers(self) -> list[dict]:
+        """Get all managed servers."""
+        return self._get_paginated("/api/v1/backupInfrastructure/managedServers")
+
+    def get_license(self) -> dict:
+        """Get license information."""
+        return self._get("/api/v1/license")
+
+    def get_scaleout_repositories(self) -> list[dict]:
+        """Get all scale-out backup repositories."""
+        return self._get_paginated("/api/v1/backupInfrastructure/scaleOutRepositories")
+
+    def get_wan_accelerators(self) -> list[dict]:
+        """Get all WAN accelerators."""
+        return self._get_paginated("/api/v1/backupInfrastructure/wanAccelerators")
+
+
+# =============================================================================
+# OUTPUT FUNCTIONS
+# =============================================================================
+
+def output_section(name: str, data: Any, redactor: VeeamRedactor | None = None) -> None:
+    """Output agent section in JSON format, optionally redacting sensitive data."""
+    print(f"<<<veeam_rest_{name}:sep(0)>>>")
+    if redactor:
+        data = redactor.redact(data)
+    print(json.dumps(data, default=str))
+
+
+def enrich_job_data(jobs: list[dict], server_name: str) -> list[dict]:
+    """Enrich job data with additional fields."""
+    now = datetime.now(timezone.utc)
+
+    for job in jobs:
+        job["backupServer"] = server_name
+
+        # Calculate job age if lastRun exists
+        last_run = job.get("lastRun")
+        if last_run:
+            try:
+                last_run_dt = datetime.fromisoformat(last_run.replace("Z", "+00:00"))
+                job["lastRunAgeSeconds"] = int((now - last_run_dt).total_seconds())
+            except (ValueError, TypeError):
+                job["lastRunAgeSeconds"] = None
+
+    return jobs
+
+
+def enrich_task_data(tasks: list[dict], server_name: str) -> list[dict]:
+    """Enrich task session data with calculated fields."""
+    now = datetime.now(timezone.utc)
+
+    for task in tasks:
+        task["backupServer"] = server_name
+
+        # Calculate backup age if endTime exists
+        end_time = task.get("endTime")
+        if end_time:
+            try:
+                end_time_dt = datetime.fromisoformat(end_time.replace("Z", "+00:00"))
+                task["backupAgeSeconds"] = int((now - end_time_dt).total_seconds())
+            except (ValueError, TypeError):
+                task["backupAgeSeconds"] = None
+
+        # Parse duration to seconds if available
+        progress = task.get("progress", {})
+        if progress:
+            duration_str = progress.get("duration")
+            if duration_str:
+                try:
+                    # Duration format: "HH:MM:SS" or "D.HH:MM:SS"
+                    parts = duration_str.split(":")
+                    if len(parts) == 3:
+                        if "." in parts[0]:
+                            day_hour = parts[0].split(".")
+                            days = int(day_hour[0])
+                            hours = int(day_hour[1])
+                        else:
+                            days = 0
+                            hours = int(parts[0])
+                        minutes = int(parts[1])
+                        seconds = int(float(parts[2]))
+                        task["durationSeconds"] = days * 86400 + hours * 3600 + minutes * 60 + seconds
+                except (ValueError, IndexError):
+                    task["durationSeconds"] = None
+
+    return tasks
+
+
+# =============================================================================
+# MAIN
+# =============================================================================
+
+def parse_arguments() -> argparse.Namespace:
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(
+        description="Veeam Backup & Replication REST API Special Agent"
+    )
+
+    parser.add_argument(
+        "--hostname",
+        required=True,
+        help="Veeam server hostname or IP"
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=9419,
+        help="REST API port (default: 9419)"
+    )
+    parser.add_argument(
+        "--username",
+        required=True,
+        help="API username (format: DOMAIN\\user or user@domain)"
+    )
+    parser.add_argument(
+        "--password",
+        required=True,
+        help="API password"
+    )
+    parser.add_argument(
+        "--no-cert-check",
+        action="store_true",
+        help="Disable SSL certificate verification"
+    )
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        default=60,
+        help="API timeout in seconds (default: 60)"
+    )
+    parser.add_argument(
+        "--sections",
+        nargs="*",
+        default=["jobs", "tasks", "repositories", "proxies"],
+        help="Sections to collect"
+    )
+    parser.add_argument(
+        "--session-age",
+        type=int,
+        default=86400,
+        help="Max session/task age in seconds (default: 86400 = 24h)"
+    )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Enable debug output"
+    )
+    parser.add_argument(
+        "--redact",
+        action="store_true",
+        help="Redact sensitive values (hostnames, paths, IDs) for safe sharing"
+    )
+
+    return parser.parse_args()
+
+
+def main() -> int:
+    args = parse_arguments()
+
+    # Create redactor if --redact flag is set
+    redactor = VeeamRedactor() if args.redact else None
+
+    try:
+        # Create API client
+        api = VeeamRestAPI(
+            hostname=args.hostname,
+            port=args.port,
+            username=args.username,
+            password=args.password,
+            verify_ssl=not args.no_cert_check,
+            timeout=args.timeout,
+        )
+
+        # Get server info for enrichment
+        server_name = args.hostname
+        if "server" in args.sections or args.debug:
+            try:
+                server_info = api.get_server_info()
+                server_name = server_info.get("backupServerName", args.hostname)
+                if "server" in args.sections:
+                    output_section("server", server_info, redactor)
+            except VeeamAPIError as e:
+                if args.debug:
+                    sys.stderr.write(f"Warning: Could not get server info: {e}\n")
+
+        # Calculate time filter for sessions/tasks
+        created_after = None
+        if args.session_age > 0:
+            created_after = (
+                datetime.now(timezone.utc) - timedelta(seconds=args.session_age)
+            ).isoformat()
+
+        # Collect and output sections
+        if "jobs" in args.sections:
+            jobs = api.get_job_states()
+            jobs = enrich_job_data(jobs, server_name)
+            output_section("jobs", jobs, redactor)
+
+        if "tasks" in args.sections:
+            tasks = api.get_task_sessions(created_after)
+            tasks = enrich_task_data(tasks, server_name)
+            output_section("tasks", tasks, redactor)
+
+        if "sessions" in args.sections:
+            sessions = api.get_sessions(created_after)
+            output_section("sessions", sessions, redactor)
+
+        if "repositories" in args.sections:
+            repos = api.get_repository_states()
+            output_section("repositories", repos, redactor)
+
+        if "proxies" in args.sections:
+            proxies = api.get_proxy_states()
+            output_section("proxies", proxies, redactor)
+
+        if "managed_servers" in args.sections:
+            servers = api.get_managed_servers()
+            output_section("managed_servers", servers, redactor)
+
+        if "license" in args.sections:
+            license_info = api.get_license()
+            output_section("license", license_info, redactor)
+
+        if "scaleout_repositories" in args.sections:
+            scaleout_repos = api.get_scaleout_repositories()
+            output_section("scaleout_repositories", scaleout_repos, redactor)
+
+        if "wan_accelerators" in args.sections:
+            wan_accelerators = api.get_wan_accelerators()
+            output_section("wan_accelerators", wan_accelerators, redactor)
+
+    except VeeamAPIError as e:
+        # Output error section so check plugin can report it
+        print("<<<veeam_rest_error>>>")
+        print(str(e))
+        sys.stderr.write(f"Error: {e}\n")
+        return 1
+
+    except Exception as e:
+        sys.stderr.write(f"Unexpected error: {e}\n")
+        if args.debug:
+            import traceback
+            traceback.print_exc()
+        return 2
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

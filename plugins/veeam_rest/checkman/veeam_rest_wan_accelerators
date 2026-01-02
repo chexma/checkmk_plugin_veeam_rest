@@ -1,0 +1,23 @@
+title: Veeam WAN Accelerators
+agents: veeam_rest
+catalog: app/veeam
+license: GPLv2
+distribution: check_mk
+description:
+ This check monitors Veeam WAN Accelerators via the REST API.
+
+ It reports:
+ - WAN accelerator cache size
+ - High bandwidth mode status
+ - Number of connection streams
+ - Traffic port configuration
+ - Cache folder location
+
+ The check is informational and always returns OK if the
+ WAN accelerator is found in the API response.
+
+discovery:
+ One service is created for each WAN accelerator.
+
+item:
+ The WAN accelerator name or IP address

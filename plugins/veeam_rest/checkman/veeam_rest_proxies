@@ -1,0 +1,25 @@
+title: Veeam Backup Proxies
+agents: veeam_rest
+catalog: app/veeam
+license: GPLv2
+distribution: check_mk
+description:
+ This check monitors Veeam backup proxy status via the REST API.
+
+ It reports:
+ - Proxy type (VMware, Hyper-V, General Purpose)
+ - Online/offline status
+ - Enabled/disabled status
+ - Outdated component warnings
+
+ The check returns:
+ - OK: Proxy is online and enabled
+ - WARN: Proxy is disabled or has outdated components
+ - CRIT: Proxy is offline
+ - UNKNOWN: No data or proxy not found
+
+item:
+ The proxy name
+
+discovery:
+ One service is created for each backup proxy.

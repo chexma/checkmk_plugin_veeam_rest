@@ -1,0 +1,28 @@
+title: Veeam Backup Repositories
+agents: veeam_rest
+catalog: app/veeam
+license: GPLv2
+distribution: check_mk
+description:
+ This check monitors Veeam backup repository capacity and status
+ via the REST API.
+
+ It reports:
+ - Repository capacity and usage
+ - Free space
+ - Online/offline status
+ - Outdated component warnings
+
+ The check returns:
+ - OK: Repository is online and within usage thresholds
+ - WARN: Repository has outdated components or usage exceeds warning threshold
+ - CRIT: Repository is offline or usage exceeds critical threshold
+ - UNKNOWN: No data or repository not found
+
+ Configurable thresholds for usage percentage and minimum free space.
+
+item:
+ The repository name
+
+discovery:
+ One service is created for each backup repository.

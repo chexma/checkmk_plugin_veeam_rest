@@ -1,0 +1,19 @@
+title: Veeam Backup Server
+agents: veeam_rest
+catalog: app/veeam
+license: GPLv2
+distribution: check_mk
+description:
+ This check monitors the Veeam Backup & Replication server information via the REST API.
+
+ It reports:
+ - Server name and build version
+ - Installed patches
+ - Database engine and version (SQL Server or PostgreSQL)
+ - Platform information
+ - Installation ID
+
+ The check is informational and always returns OK if data is available.
+
+discovery:
+ One service is created for the Veeam backup server.
