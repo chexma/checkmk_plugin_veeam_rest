@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
-WATO ruleset for the Veeam REST API special agent.
+WATO ruleset for deploying the Veeam REST API agent plugin via Agent Bakery.
 
-This defines the configuration form in Setup > Agents > Other integrations.
+This defines the configuration form in Setup > Agents > Windows, Linux, Solaris, AIX > Agent rules.
+The plugin runs locally on the Veeam server, connecting to localhost - no firewall ports needed.
 """
 
-from cmk.rulesets.v1 import Help, Title
+from cmk.rulesets.v1 import Help, Label, Title
 from cmk.rulesets.v1.form_specs import (
     BooleanChoice,
     DefaultValue,
@@ -21,28 +22,20 @@ from cmk.rulesets.v1.form_specs import (
     migrate_to_password,
     validators,
 )
-from cmk.rulesets.v1.rule_specs import SpecialAgent, Topic
+from cmk.rulesets.v1.rule_specs import AgentConfig, Topic
 
 
 def _parameter_form() -> Dictionary:
     return Dictionary(
-        title=Title("Veeam Backup & Replication (REST API)"),
+        title=Title("Veeam REST API Agent Plugin"),
         help_text=Help(
-            "This rule configures the special agent for monitoring "
-            "Veeam Backup & Replication servers via REST API. "
-            "Requires Veeam B&R 12.0 or later with REST API enabled on port 9419."
+            "Deploy the Veeam REST API agent plugin to Windows hosts running "
+            "Veeam Backup & Replication. The plugin connects to the local REST API "
+            "(localhost:9419), so no firewall ports need to be opened to the CheckMK server. "
+            "This is an alternative to the special agent approach."
         ),
         elements={
-            # Connection settings
-            "port": DictElement(
-                required=False,
-                parameter_form=Integer(
-                    title=Title("REST API Port"),
-                    help_text=Help("Default is 9419"),
-                    prefill=DefaultValue(9419),
-                    custom_validate=(validators.NumberInRange(min_value=1, max_value=65535),),
-                ),
-            ),
+            # Authentication
             "username": DictElement(
                 required=True,
                 parameter_form=String(
@@ -60,16 +53,25 @@ def _parameter_form() -> Dictionary:
                     migrate=migrate_to_password,
                 ),
             ),
+            # Connection settings
+            "port": DictElement(
+                required=False,
+                parameter_form=Integer(
+                    title=Title("REST API Port"),
+                    help_text=Help("Default is 9419. The plugin always connects to localhost."),
+                    prefill=DefaultValue(9419),
+                    custom_validate=(validators.NumberInRange(min_value=1, max_value=65535),),
+                ),
+            ),
             "no_cert_check": DictElement(
                 required=False,
                 parameter_form=BooleanChoice(
                     title=Title("Disable SSL Certificate Verification"),
-                    label=Title("Do not verify SSL certificate"),
+                    label=Label("Do not verify SSL certificate"),
                     help_text=Help(
-                        "Use this for self-signed certificates. "
-                        "Not recommended for production environments."
+                        "Recommended for localhost connections with self-signed certificates."
                     ),
-                    prefill=DefaultValue(False),
+                    prefill=DefaultValue(True),
                 ),
             ),
             "timeout": DictElement(
@@ -145,20 +147,34 @@ def _parameter_form() -> Dictionary:
                         "Reducing this value improves performance."
                     ),
                     displayed_magnitudes=[TimeMagnitude.HOUR, TimeMagnitude.DAY],
-                    prefill=DefaultValue(86400),  # 24 hours
+                    prefill=DefaultValue(86400.0),  # 24 hours
+                ),
+            ),
+            # Caching/async execution
+            "cache_interval": DictElement(
+                required=False,
+                parameter_form=TimeSpan(
+                    title=Title("Cache Interval"),
+                    help_text=Help(
+                        "How long to cache the plugin output. The plugin will run asynchronously "
+                        "and results will be cached for this duration. Set to 0 for synchronous execution."
+                    ),
+                    displayed_magnitudes=[TimeMagnitude.SECOND, TimeMagnitude.MINUTE],
+                    prefill=DefaultValue(300.0),  # 5 minutes
                 ),
             ),
         },
     )
 
 
-rule_spec_veeam_rest = SpecialAgent(
+rule_spec_agent_config_veeam_rest = AgentConfig(
     name="veeam_rest",
-    title=Title("Veeam Backup & Replication (REST API)"),
+    title=Title("Veeam REST API Agent Plugin"),
     topic=Topic.APPLICATIONS,
     parameter_form=_parameter_form,
     help_text=Help(
-        "Monitors Veeam Backup & Replication servers using the REST API. "
-        "Collects backup job status, repository capacity, proxy status, and more."
+        "Deploy the Veeam REST API agent plugin to monitor Veeam Backup & Replication "
+        "servers locally. The plugin runs on the Veeam server itself and connects to "
+        "localhost, avoiding the need to open firewall ports for remote access."
     ),
 )
