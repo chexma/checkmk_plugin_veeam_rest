@@ -102,6 +102,13 @@ STATE_MAP = {
 }
 
 
+def _format_duration_hms(seconds: int) -> str:
+    """Format duration as HH:MM:SS."""
+    hours, remainder = divmod(int(seconds), 3600)
+    minutes, secs = divmod(remainder, 60)
+    return f"{hours:02d}:{minutes:02d}:{secs:02d}"
+
+
 def _get_latest_task(item: str, section: Section) -> dict | None:
     """Find the most recent task for an item."""
     latest_task = None
@@ -163,6 +170,12 @@ def check_veeam_rest_tasks(
     if state_str == "Working":
         summary_parts.append(f"Progress: {progress_percent}%")
         check_state = State.OK  # Running is OK
+    else:
+        # Add duration and processed size for completed tasks
+        if duration_seconds is not None:
+            summary_parts.append(f"Last Duration: {_format_duration_hms(duration_seconds)}")
+        if processed_size is not None:
+            summary_parts.append(f"Processed: {render.bytes(processed_size)}")
 
     yield Result(state=check_state, summary=", ".join(summary_parts))
 
