@@ -16,8 +16,8 @@ Checkmk 2.4 plugin for monitoring Veeam Backup & Replication servers via the RES
 ## Installation
 
 ```bash
-mkp add veeam_rest-1.0.0.mkp
-mkp enable veeam_rest 1.0.0
+mkp add veeam_rest-0.0.3.mkp
+mkp enable veeam_rest 0.0.3
 omd restart apache
 ```
 
@@ -30,16 +30,32 @@ omd restart apache
 ## Special Agent Usage
 
 ```bash
-# Standard collection
+# Standard collection (silent)
 ./agent_veeam_rest --hostname 192.168.1.1 --username '.\user' \
     --password secret --no-cert-check
+
+# With verbosity for troubleshooting
+./agent_veeam_rest --hostname 192.168.1.1 --username '.\user' \
+    --password secret --no-cert-check -vv
 
 # Redacted output for safe sharing
 ./agent_veeam_rest --hostname 192.168.1.1 --username '.\user' \
     --password secret --no-cert-check --redact
 ```
 
-The `--redact` flag anonymizes hostnames, paths, IDs, and descriptions while preserving metrics and status values for testing.
+### CLI Options
+
+| Option | Description |
+|--------|-------------|
+| `-v` | Show section summaries and warnings |
+| `-vv` | + API endpoints and item counts |
+| `-vvv` | + Request timing and pagination details |
+| `--debug` | Show Python stack traces on errors |
+| `--redact` | Anonymize hostnames, paths, IDs for safe sharing |
+
+### Partial Failure Handling
+
+The agent continues collecting data even if individual sections fail. Failed sections are reported in a `<<<veeam_rest_errors>>>` section, allowing partial monitoring when specific API endpoints are unavailable.
 
 ## Requirements
 

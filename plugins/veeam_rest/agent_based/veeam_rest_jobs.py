@@ -227,10 +227,16 @@ def check_veeam_rest_jobs(
     # Check if job is running
     if status == "Running":
         summary_parts.append(f"Progress: {progress}%")
+    else:
+        # Add duration and processed size for completed jobs
+        session_progress = job.get("sessionProgress", {}) or {}
+        duration = session_progress.get("duration", "")
+        processed_size = session_progress.get("processedSize", 0)
 
-    # Add last run time
-    if last_run:
-        summary_parts.append(f"Last run: {last_run}")
+        if duration:
+            summary_parts.append(f"Last Duration: {duration}")
+        if processed_size and processed_size > 0:
+            summary_parts.append(f"Processed: {render.bytes(processed_size)}")
 
     yield Result(state=state, summary=", ".join(summary_parts))
 
