@@ -132,25 +132,26 @@ def check_veeam_rest_license(
             exp_warn = params.get("license_expiration_warn", 30)
             exp_crit = params.get("license_expiration_crit", 7)
 
+            threshold_info = f"(warn/crit below {exp_warn}/{exp_crit} days)"
             if days_left < 0:
                 yield Result(
                     state=State.CRIT,
-                    summary=f"License expired {abs(days_left)} days ago",
+                    summary=f"License expired {abs(days_left)} days ago {threshold_info}",
                 )
             elif days_left <= exp_crit:
                 yield Result(
                     state=State.CRIT,
-                    summary=f"License expires in {days_left} days",
+                    summary=f"License expires in {days_left} days {threshold_info}",
                 )
             elif days_left <= exp_warn:
                 yield Result(
                     state=State.WARN,
-                    summary=f"License expires in {days_left} days",
+                    summary=f"License expires in {days_left} days {threshold_info}",
                 )
             else:
                 yield Result(
                     state=State.OK,
-                    summary=f"License expires in {days_left} days",
+                    summary=f"License expires in {days_left} days {threshold_info}",
                 )
             yield Metric("license_days_remaining", days_left)
 
@@ -162,20 +163,26 @@ def check_veeam_rest_license(
             support_exp_warn = params.get("support_expiration_warn", 30)
             support_exp_crit = params.get("support_expiration_crit", 7)
 
+            support_threshold_info = f"(warn/crit below {support_exp_warn}/{support_exp_crit} days)"
             if support_days_left < 0:
                 yield Result(
                     state=State.WARN,
-                    summary=f"Support contract expired {abs(support_days_left)} days ago",
+                    summary=f"Support contract expired {abs(support_days_left)} days ago {support_threshold_info}",
                 )
             elif support_days_left <= support_exp_crit:
                 yield Result(
                     state=State.WARN,
-                    summary=f"Support contract expires in {support_days_left} days",
+                    summary=f"Support contract expires in {support_days_left} days {support_threshold_info}",
                 )
             elif support_days_left <= support_exp_warn:
                 yield Result(
                     state=State.WARN,
-                    summary=f"Support contract expires in {support_days_left} days",
+                    summary=f"Support contract expires in {support_days_left} days {support_threshold_info}",
+                )
+            else:
+                yield Result(
+                    state=State.OK,
+                    summary=f"Support contract expires in {support_days_left} days {support_threshold_info}",
                 )
             yield Metric("support_days_remaining", support_days_left)
 
@@ -189,20 +196,21 @@ def check_veeam_rest_license(
             usage_warn = params.get("instance_usage_warn", 80.0)
             usage_crit = params.get("instance_usage_crit", 95.0)
 
+            usage_threshold_info = f"(warn/crit at {usage_warn:.0f}/{usage_crit:.0f}%)"
             if usage_percent >= usage_crit:
                 yield Result(
                     state=State.CRIT,
-                    summary=f"Instance usage: {used:.0f}/{licensed:.0f} ({usage_percent:.1f}%)",
+                    summary=f"Instance usage: {used:.0f}/{licensed:.0f} ({usage_percent:.1f}%) {usage_threshold_info}",
                 )
             elif usage_percent >= usage_warn:
                 yield Result(
                     state=State.WARN,
-                    summary=f"Instance usage: {used:.0f}/{licensed:.0f} ({usage_percent:.1f}%)",
+                    summary=f"Instance usage: {used:.0f}/{licensed:.0f} ({usage_percent:.1f}%) {usage_threshold_info}",
                 )
             else:
                 yield Result(
                     state=State.OK,
-                    summary=f"Instance usage: {used:.0f}/{licensed:.0f} ({usage_percent:.1f}%)",
+                    summary=f"Instance usage: {used:.0f}/{licensed:.0f} ({usage_percent:.1f}%) {usage_threshold_info}",
                 )
 
             yield Metric("license_instances_used", used)
