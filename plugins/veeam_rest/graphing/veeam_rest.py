@@ -151,6 +151,62 @@ perfometer_repository_usage = Perfometer(
 
 
 # =============================================================================
+# JOB METRICS
+# =============================================================================
+
+metric_job_duration = Metric(
+    name="job_duration",
+    title=Title("Job duration"),
+    unit=UNIT_TIME,
+    color=Color.BLUE,
+)
+
+metric_job_size_processed = Metric(
+    name="job_size_processed",
+    title=Title("Job processed data"),
+    unit=UNIT_BYTES,
+    color=Color.GREEN,
+)
+
+metric_job_size_read = Metric(
+    name="job_size_read",
+    title=Title("Job read data"),
+    unit=UNIT_BYTES,
+    color=Color.CYAN,
+)
+
+metric_job_size_transferred = Metric(
+    name="job_size_transferred",
+    title=Title("Job transferred data"),
+    unit=UNIT_BYTES,
+    color=Color.ORANGE,
+)
+
+
+# =============================================================================
+# JOB GRAPHS
+# =============================================================================
+
+graph_job_duration = Graph(
+    name="veeam_job_duration",
+    title=Title("Veeam Job Duration"),
+    simple_lines=["job_duration"],
+    minimal_range=MinimalRange(0, 1),
+)
+
+graph_job_data = Graph(
+    name="veeam_job_data",
+    title=Title("Veeam Job Data Transfer"),
+    simple_lines=[
+        "job_size_processed",
+        "job_size_read",
+        "job_size_transferred",
+    ],
+    minimal_range=MinimalRange(0, 1),
+)
+
+
+# =============================================================================
 # LICENSE METRICS
 # =============================================================================
 

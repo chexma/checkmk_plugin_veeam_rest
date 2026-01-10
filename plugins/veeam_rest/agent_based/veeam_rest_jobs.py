@@ -14,6 +14,7 @@ from cmk.agent_based.v2 import (
     CheckPlugin,
     CheckResult,
     DiscoveryResult,
+    Metric,
     Result,
     Service,
     State,
@@ -152,6 +153,30 @@ STATE_MAP = {
     "warn": State.WARN,
     "crit": State.CRIT,
 }
+
+
+def _parse_duration_to_seconds(duration_str: str) -> int | None:
+    """Parse duration string like '00:03:26' or '1.00:03:26' to seconds."""
+    if not duration_str:
+        return None
+    try:
+        parts = duration_str.split(":")
+        if len(parts) == 3:
+            # Check if first part contains days (e.g., "1.00")
+            hours_part = parts[0]
+            if "." in hours_part:
+                days_str, hours_str = hours_part.split(".", 1)
+                days = int(days_str)
+                hours = int(hours_str)
+            else:
+                days = 0
+                hours = int(hours_part)
+            minutes = int(parts[1])
+            seconds = int(parts[2])
+            return days * 86400 + hours * 3600 + minutes * 60 + seconds
+    except (ValueError, IndexError):
+        pass
+    return None
 
 
 def _get_result_state(result: str, params: Mapping[str, Any]) -> State:
@@ -313,6 +338,20 @@ def check_veeam_rest_jobs(
         flags.append("Storage Snapshot")
     if flags:
         yield Result(state=State.OK, notice=f"Flags: {', '.join(flags)}")
+
+    # Metrics for graphing
+    duration_seconds = _parse_duration_to_seconds(duration)
+    if duration_seconds is not None:
+        yield Metric("job_duration", duration_seconds)
+
+    if processed_size and processed_size > 0:
+        yield Metric("job_size_processed", processed_size)
+
+    if read_size and read_size > 0:
+        yield Metric("job_size_read", read_size)
+
+    if transferred_size and transferred_size > 0:
+        yield Metric("job_size_transferred", transferred_size)
 
 
 check_plugin_veeam_rest_jobs = CheckPlugin(
