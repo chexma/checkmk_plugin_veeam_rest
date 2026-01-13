@@ -60,6 +60,17 @@ def _agent_arguments(
     if "session_age" in params:
         args.extend(["--session-age", str(int(params["session_age"]))])
 
+    # Caching options
+    if params.get("no_cache", False):
+        args.append("--no-cache")
+    elif "cache_intervals" in params:
+        # Build comma-separated section:interval pairs
+        cache_intervals = params["cache_intervals"]
+        if cache_intervals:
+            pairs = [f"{section}:{int(interval)}" for section, interval in cache_intervals.items()]
+            if pairs:
+                args.extend(["--cached-sections", ",".join(pairs)])
+
     yield SpecialAgentCommand(command_arguments=args)
 
 

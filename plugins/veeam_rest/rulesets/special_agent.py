@@ -148,6 +148,122 @@ def _parameter_form() -> Dictionary:
                     prefill=DefaultValue(86400),  # 24 hours
                 ),
             ),
+            # Caching options
+            "no_cache": DictElement(
+                required=False,
+                parameter_form=BooleanChoice(
+                    title=Title("Disable Caching"),
+                    label=Title("Disable all section caching"),
+                    help_text=Help(
+                        "By default, sections are cached to reduce API load. "
+                        "Enable this to always fetch fresh data."
+                    ),
+                    prefill=DefaultValue(False),
+                ),
+            ),
+            "cache_intervals": DictElement(
+                required=False,
+                parameter_form=Dictionary(
+                    title=Title("Cache Intervals per Section"),
+                    help_text=Help(
+                        "Override default cache intervals for specific sections. "
+                        "Set to 0 to disable caching for a section. "
+                        "Leave empty to use defaults."
+                    ),
+                    elements={
+                        "jobs": DictElement(
+                            required=False,
+                            parameter_form=TimeSpan(
+                                title=Title("Jobs"),
+                                help_text=Help("Default: 5 minutes"),
+                                displayed_magnitudes=[TimeMagnitude.MINUTE, TimeMagnitude.HOUR],
+                                prefill=DefaultValue(300),
+                            ),
+                        ),
+                        "tasks": DictElement(
+                            required=False,
+                            parameter_form=TimeSpan(
+                                title=Title("Tasks"),
+                                help_text=Help("Default: 1 minute"),
+                                displayed_magnitudes=[TimeMagnitude.MINUTE, TimeMagnitude.HOUR],
+                                prefill=DefaultValue(60),
+                            ),
+                        ),
+                        "sessions": DictElement(
+                            required=False,
+                            parameter_form=TimeSpan(
+                                title=Title("Sessions"),
+                                help_text=Help("Default: 5 minutes"),
+                                displayed_magnitudes=[TimeMagnitude.MINUTE, TimeMagnitude.HOUR],
+                                prefill=DefaultValue(300),
+                            ),
+                        ),
+                        "repositories": DictElement(
+                            required=False,
+                            parameter_form=TimeSpan(
+                                title=Title("Repositories"),
+                                help_text=Help("Default: 30 minutes"),
+                                displayed_magnitudes=[TimeMagnitude.MINUTE, TimeMagnitude.HOUR],
+                                prefill=DefaultValue(1800),
+                            ),
+                        ),
+                        "proxies": DictElement(
+                            required=False,
+                            parameter_form=TimeSpan(
+                                title=Title("Proxies"),
+                                help_text=Help("Default: 1 hour"),
+                                displayed_magnitudes=[TimeMagnitude.MINUTE, TimeMagnitude.HOUR],
+                                prefill=DefaultValue(3600),
+                            ),
+                        ),
+                        "managed_servers": DictElement(
+                            required=False,
+                            parameter_form=TimeSpan(
+                                title=Title("Managed Servers"),
+                                help_text=Help("Default: 1 hour"),
+                                displayed_magnitudes=[TimeMagnitude.MINUTE, TimeMagnitude.HOUR],
+                                prefill=DefaultValue(3600),
+                            ),
+                        ),
+                        "license": DictElement(
+                            required=False,
+                            parameter_form=TimeSpan(
+                                title=Title("License"),
+                                help_text=Help("Default: 24 hours"),
+                                displayed_magnitudes=[TimeMagnitude.HOUR, TimeMagnitude.DAY],
+                                prefill=DefaultValue(86400),
+                            ),
+                        ),
+                        "server": DictElement(
+                            required=False,
+                            parameter_form=TimeSpan(
+                                title=Title("Server Info"),
+                                help_text=Help("Default: 24 hours"),
+                                displayed_magnitudes=[TimeMagnitude.HOUR, TimeMagnitude.DAY],
+                                prefill=DefaultValue(86400),
+                            ),
+                        ),
+                        "scaleout_repositories": DictElement(
+                            required=False,
+                            parameter_form=TimeSpan(
+                                title=Title("Scale-Out Repositories"),
+                                help_text=Help("Default: 30 minutes"),
+                                displayed_magnitudes=[TimeMagnitude.MINUTE, TimeMagnitude.HOUR],
+                                prefill=DefaultValue(1800),
+                            ),
+                        ),
+                        "wan_accelerators": DictElement(
+                            required=False,
+                            parameter_form=TimeSpan(
+                                title=Title("WAN Accelerators"),
+                                help_text=Help("Default: 1 hour"),
+                                displayed_magnitudes=[TimeMagnitude.MINUTE, TimeMagnitude.HOUR],
+                                prefill=DefaultValue(3600),
+                            ),
+                        ),
+                    },
+                ),
+            ),
         },
     )
 

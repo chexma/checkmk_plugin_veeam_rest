@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.11] - 2026-01-13
+
+### Added
+- Per-section caching to reduce API load
+- Configurable cache intervals via GUI (Setup > Agents > Other integrations)
+- `--cached-sections` and `--no-cache` CLI arguments
+- Cache files stored in Checkmk tmp directory
+
+### Cache Defaults
+- Jobs: 5 minutes
+- Tasks: 1 minute
+- Sessions: 5 minutes
+- Repositories: 30 minutes
+- Proxies: 1 hour
+- Managed Servers: 1 hour
+- License: 24 hours
+- Server Info: 24 hours
+- Scale-Out Repositories: 30 minutes
+- WAN Accelerators: 1 hour
+
 ## [0.0.10] - 2026-01-13
 
 ### Fixed
