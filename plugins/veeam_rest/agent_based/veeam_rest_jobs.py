@@ -179,6 +179,30 @@ def _parse_duration_to_seconds(duration_str: str) -> int | None:
     return None
 
 
+def _parse_rate_to_bytes_per_second(rate_str: str) -> float | None:
+    """Parse rate string like '1,1 GB/s' or '500 MB/s' to bytes/second."""
+    if not rate_str:
+        return None
+    try:
+        # Handle European decimal format (1,1 -> 1.1)
+        rate_str = rate_str.replace(",", ".")
+        parts = rate_str.split()
+        if len(parts) != 2:
+            return None
+        value = float(parts[0])
+        unit = parts[1].upper()
+        multipliers = {
+            "B/S": 1,
+            "KB/S": 1024,
+            "MB/S": 1024**2,
+            "GB/S": 1024**3,
+            "TB/S": 1024**4,
+        }
+        return value * multipliers.get(unit, 1)
+    except (ValueError, IndexError):
+        return None
+
+
 def _get_result_state(result: str, params: Mapping[str, Any]) -> State:
     """Get the configured state for a job result."""
     result_states = params.get("result_states", {})
@@ -291,6 +315,7 @@ def check_veeam_rest_jobs(
     processed_size = session_progress.get("processedSize", 0)
     read_size = session_progress.get("readSize", 0)
     transferred_size = session_progress.get("transferredSize", 0)
+    processing_rate = session_progress.get("processingRate", "")
 
     # Details section
     yield Result(state=State.OK, notice=f"Type: {job_type}")
@@ -327,6 +352,9 @@ def check_veeam_rest_jobs(
     if transferred_size > 0:
         yield Result(state=State.OK, notice=f"Transferred: {render.disksize(transferred_size)}")
 
+    if processing_rate:
+        yield Result(state=State.OK, notice=f"Speed: {processing_rate}")
+
     if bottleneck and bottleneck not in ("NotDefined", "Unknown"):
         yield Result(state=State.OK, notice=f"Bottleneck: {bottleneck}")
 
@@ -352,6 +380,10 @@ def check_veeam_rest_jobs(
 
     if transferred_size and transferred_size > 0:
         yield Metric("job_size_transferred", transferred_size)
+
+    speed_bytes = _parse_rate_to_bytes_per_second(processing_rate)
+    if speed_bytes is not None:
+        yield Metric("job_speed", speed_bytes)
 
 
 check_plugin_veeam_rest_jobs = CheckPlugin(

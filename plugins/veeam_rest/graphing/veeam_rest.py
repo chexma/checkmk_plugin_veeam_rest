@@ -24,6 +24,7 @@ from cmk.graphing.v1.perfometers import Closed, FocusRange, Open, Perfometer
 # =============================================================================
 
 UNIT_BYTES = Unit(IECNotation("B"))
+UNIT_BYTES_PER_SECOND = Unit(IECNotation("B/s"))
 UNIT_PERCENTAGE = Unit(DecimalNotation("%"), StrictPrecision(1))
 UNIT_TIME = Unit(TimeNotation())
 
@@ -182,6 +183,13 @@ metric_job_size_transferred = Metric(
     color=Color.ORANGE,
 )
 
+metric_job_speed = Metric(
+    name="job_speed",
+    title=Title("Job processing speed"),
+    unit=UNIT_BYTES_PER_SECOND,
+    color=Color.PURPLE,
+)
+
 
 # =============================================================================
 # JOB GRAPHS
@@ -202,6 +210,13 @@ graph_job_data = Graph(
         "job_size_read",
         "job_size_transferred",
     ],
+    minimal_range=MinimalRange(0, 1),
+)
+
+graph_job_speed = Graph(
+    name="veeam_job_speed",
+    title=Title("Veeam Job Speed"),
+    simple_lines=["job_speed"],
     minimal_range=MinimalRange(0, 1),
 )
 

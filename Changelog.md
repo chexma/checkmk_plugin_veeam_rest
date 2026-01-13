@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.12] - 2026-01-13
+
+### Added
+- Speed display in Job details (from API's `processingRate` field)
+- Job processing speed metric (`job_speed`) for graphing
+- New "Veeam Job Speed" graph showing backup throughput over time
+
+### Changed
+- Improved "Task not found" error message to indicate session age filtering
+- Rate string parsing supports European decimal format (e.g., "1,1 GB/s")
+
 ## [0.0.11] - 2026-01-13
 
 ### Added

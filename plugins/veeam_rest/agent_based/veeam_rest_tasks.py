@@ -138,7 +138,10 @@ def check_veeam_rest_tasks(
 
     task = _get_latest_task(item, section)
     if task is None:
-        yield Result(state=State.UNKNOWN, summary="Task not found")
+        yield Result(
+            state=State.UNKNOWN,
+            summary="Task session not found (may have aged out of filter window)"
+        )
         return
 
     # Extract task properties
