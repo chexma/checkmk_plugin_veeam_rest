@@ -658,9 +658,6 @@ def main() -> int:
             timeout=args.timeout,
         )
 
-        # Track errors for partial failure handling
-        errors: list[tuple[str, str]] = []
-
         logger.warning("Collecting %d sections...", len(args.sections))
 
         # Get server info for enrichment
@@ -673,14 +670,10 @@ def main() -> int:
                 server_name = server_info.get("backupServerName", args.hostname)
                 output_section("server", server_info, redactor, timestamp, cache_interval)
             else:
-                try:
-                    server_info = api.get_server_info()
-                    server_name = server_info.get("backupServerName", args.hostname)
-                    timestamp = store_cached_section(hostname_for_cache, "server", server_info) if cache_interval else None
-                    output_section("server", server_info, redactor, timestamp, cache_interval)
-                except VeeamAPIError as e:
-                    errors.append(("server", str(e)))
-                    logger.warning("Section 'server' failed: %s", e)
+                server_info = api.get_server_info()
+                server_name = server_info.get("backupServerName", args.hostname)
+                timestamp = store_cached_section(hostname_for_cache, "server", server_info) if cache_interval else None
+                output_section("server", server_info, redactor, timestamp, cache_interval)
         else:
             # Try to get server name for enrichment even if not collecting server section
             try:
@@ -696,7 +689,6 @@ def main() -> int:
                 datetime.now(timezone.utc) - timedelta(seconds=args.session_age)
             ).isoformat()
 
-        # Collect and output sections - continue on failure
         if "jobs" in args.sections:
             cache_interval = cache_config.jobs
             cached = load_cached_section(hostname_for_cache, "jobs", cache_interval) if cache_interval else None
@@ -704,14 +696,10 @@ def main() -> int:
                 jobs, timestamp = cached
                 output_section("jobs", jobs, redactor, timestamp, cache_interval)
             else:
-                try:
-                    jobs = api.get_job_states()
-                    jobs = enrich_job_data(jobs, server_name)
-                    timestamp = store_cached_section(hostname_for_cache, "jobs", jobs) if cache_interval else None
-                    output_section("jobs", jobs, redactor, timestamp, cache_interval)
-                except VeeamAPIError as e:
-                    errors.append(("jobs", str(e)))
-                    logger.warning("Section 'jobs' failed: %s", e)
+                jobs = api.get_job_states()
+                jobs = enrich_job_data(jobs, server_name)
+                timestamp = store_cached_section(hostname_for_cache, "jobs", jobs) if cache_interval else None
+                output_section("jobs", jobs, redactor, timestamp, cache_interval)
 
         if "tasks" in args.sections:
             cache_interval = cache_config.tasks
@@ -720,14 +708,10 @@ def main() -> int:
                 tasks, timestamp = cached
                 output_section("tasks", tasks, redactor, timestamp, cache_interval)
             else:
-                try:
-                    tasks = api.get_task_sessions(created_after)
-                    tasks = enrich_task_data(tasks, server_name)
-                    timestamp = store_cached_section(hostname_for_cache, "tasks", tasks) if cache_interval else None
-                    output_section("tasks", tasks, redactor, timestamp, cache_interval)
-                except VeeamAPIError as e:
-                    errors.append(("tasks", str(e)))
-                    logger.warning("Section 'tasks' failed: %s", e)
+                tasks = api.get_task_sessions(created_after)
+                tasks = enrich_task_data(tasks, server_name)
+                timestamp = store_cached_section(hostname_for_cache, "tasks", tasks) if cache_interval else None
+                output_section("tasks", tasks, redactor, timestamp, cache_interval)
 
         if "sessions" in args.sections:
             cache_interval = cache_config.sessions
@@ -736,13 +720,9 @@ def main() -> int:
                 sessions, timestamp = cached
                 output_section("sessions", sessions, redactor, timestamp, cache_interval)
             else:
-                try:
-                    sessions = api.get_sessions(created_after)
-                    timestamp = store_cached_section(hostname_for_cache, "sessions", sessions) if cache_interval else None
-                    output_section("sessions", sessions, redactor, timestamp, cache_interval)
-                except VeeamAPIError as e:
-                    errors.append(("sessions", str(e)))
-                    logger.warning("Section 'sessions' failed: %s", e)
+                sessions = api.get_sessions(created_after)
+                timestamp = store_cached_section(hostname_for_cache, "sessions", sessions) if cache_interval else None
+                output_section("sessions", sessions, redactor, timestamp, cache_interval)
 
         if "repositories" in args.sections:
             cache_interval = cache_config.repositories
@@ -751,13 +731,9 @@ def main() -> int:
                 repos, timestamp = cached
                 output_section("repositories", repos, redactor, timestamp, cache_interval)
             else:
-                try:
-                    repos = api.get_repository_states()
-                    timestamp = store_cached_section(hostname_for_cache, "repositories", repos) if cache_interval else None
-                    output_section("repositories", repos, redactor, timestamp, cache_interval)
-                except VeeamAPIError as e:
-                    errors.append(("repositories", str(e)))
-                    logger.warning("Section 'repositories' failed: %s", e)
+                repos = api.get_repository_states()
+                timestamp = store_cached_section(hostname_for_cache, "repositories", repos) if cache_interval else None
+                output_section("repositories", repos, redactor, timestamp, cache_interval)
 
         if "proxies" in args.sections:
             cache_interval = cache_config.proxies
@@ -766,13 +742,9 @@ def main() -> int:
                 proxies, timestamp = cached
                 output_section("proxies", proxies, redactor, timestamp, cache_interval)
             else:
-                try:
-                    proxies = api.get_proxy_states()
-                    timestamp = store_cached_section(hostname_for_cache, "proxies", proxies) if cache_interval else None
-                    output_section("proxies", proxies, redactor, timestamp, cache_interval)
-                except VeeamAPIError as e:
-                    errors.append(("proxies", str(e)))
-                    logger.warning("Section 'proxies' failed: %s", e)
+                proxies = api.get_proxy_states()
+                timestamp = store_cached_section(hostname_for_cache, "proxies", proxies) if cache_interval else None
+                output_section("proxies", proxies, redactor, timestamp, cache_interval)
 
         if "managed_servers" in args.sections:
             cache_interval = cache_config.managed_servers
@@ -781,13 +753,9 @@ def main() -> int:
                 servers, timestamp = cached
                 output_section("managed_servers", servers, redactor, timestamp, cache_interval)
             else:
-                try:
-                    servers = api.get_managed_servers()
-                    timestamp = store_cached_section(hostname_for_cache, "managed_servers", servers) if cache_interval else None
-                    output_section("managed_servers", servers, redactor, timestamp, cache_interval)
-                except VeeamAPIError as e:
-                    errors.append(("managed_servers", str(e)))
-                    logger.warning("Section 'managed_servers' failed: %s", e)
+                servers = api.get_managed_servers()
+                timestamp = store_cached_section(hostname_for_cache, "managed_servers", servers) if cache_interval else None
+                output_section("managed_servers", servers, redactor, timestamp, cache_interval)
 
         if "license" in args.sections:
             cache_interval = cache_config.license
@@ -796,13 +764,9 @@ def main() -> int:
                 license_info, timestamp = cached
                 output_section("license", license_info, redactor, timestamp, cache_interval)
             else:
-                try:
-                    license_info = api.get_license()
-                    timestamp = store_cached_section(hostname_for_cache, "license", license_info) if cache_interval else None
-                    output_section("license", license_info, redactor, timestamp, cache_interval)
-                except VeeamAPIError as e:
-                    errors.append(("license", str(e)))
-                    logger.warning("Section 'license' failed: %s", e)
+                license_info = api.get_license()
+                timestamp = store_cached_section(hostname_for_cache, "license", license_info) if cache_interval else None
+                output_section("license", license_info, redactor, timestamp, cache_interval)
 
         if "scaleout_repositories" in args.sections:
             cache_interval = cache_config.scaleout_repositories
@@ -811,13 +775,9 @@ def main() -> int:
                 scaleout_repos, timestamp = cached
                 output_section("scaleout_repositories", scaleout_repos, redactor, timestamp, cache_interval)
             else:
-                try:
-                    scaleout_repos = api.get_scaleout_repositories()
-                    timestamp = store_cached_section(hostname_for_cache, "scaleout_repositories", scaleout_repos) if cache_interval else None
-                    output_section("scaleout_repositories", scaleout_repos, redactor, timestamp, cache_interval)
-                except VeeamAPIError as e:
-                    errors.append(("scaleout_repositories", str(e)))
-                    logger.warning("Section 'scaleout_repositories' failed: %s", e)
+                scaleout_repos = api.get_scaleout_repositories()
+                timestamp = store_cached_section(hostname_for_cache, "scaleout_repositories", scaleout_repos) if cache_interval else None
+                output_section("scaleout_repositories", scaleout_repos, redactor, timestamp, cache_interval)
 
         if "wan_accelerators" in args.sections:
             cache_interval = cache_config.wan_accelerators
@@ -826,19 +786,9 @@ def main() -> int:
                 wan_accelerators, timestamp = cached
                 output_section("wan_accelerators", wan_accelerators, redactor, timestamp, cache_interval)
             else:
-                try:
-                    wan_accelerators = api.get_wan_accelerators()
-                    timestamp = store_cached_section(hostname_for_cache, "wan_accelerators", wan_accelerators) if cache_interval else None
-                    output_section("wan_accelerators", wan_accelerators, redactor, timestamp, cache_interval)
-                except VeeamAPIError as e:
-                    errors.append(("wan_accelerators", str(e)))
-                    logger.warning("Section 'wan_accelerators' failed: %s", e)
-
-        # Output error section if any sections failed
-        if errors:
-            error_data = [{"section": s, "error": e} for s, e in errors]
-            output_section("errors", error_data, redactor)
-            logger.warning("Completed with %d section failures", len(errors))
+                wan_accelerators = api.get_wan_accelerators()
+                timestamp = store_cached_section(hostname_for_cache, "wan_accelerators", wan_accelerators) if cache_interval else None
+                output_section("wan_accelerators", wan_accelerators, redactor, timestamp, cache_interval)
 
     except VeeamAPIError as e:
         # Authentication or critical API error
