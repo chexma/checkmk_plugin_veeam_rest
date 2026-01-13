@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.10] - 2026-01-13
+
+### Fixed
+- License and Server rulesets now use HostCondition() for singleton services
+- Fixes "rule does not match" display in Checkmk UI for Veeam License and Veeam Backup Server rules
+
 ## [0.0.9] - 2026-01-13
 
 ### Fixed

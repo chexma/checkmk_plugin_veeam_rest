@@ -20,7 +20,7 @@ from cmk.rulesets.v1.form_specs import (
     SingleChoice,
     SingleChoiceElement,
 )
-from cmk.rulesets.v1.rule_specs import CheckParameters, HostAndItemCondition, Topic
+from cmk.rulesets.v1.rule_specs import CheckParameters, HostAndItemCondition, HostCondition, Topic
 
 
 # =============================================================================
@@ -431,7 +431,7 @@ rule_spec_veeam_rest_license = CheckParameters(
     title=Title("Veeam License"),
     topic=Topic.APPLICATIONS,
     parameter_form=_veeam_rest_license_form,
-    condition=HostAndItemCondition(item_title=Title("License")),
+    condition=HostCondition(),  # Singleton service - no item
 )
 
 
@@ -452,7 +452,7 @@ rule_spec_veeam_rest_server = CheckParameters(
     title=Title("Veeam Backup Server"),
     topic=Topic.APPLICATIONS,
     parameter_form=_veeam_rest_server_form,
-    condition=HostAndItemCondition(item_title=Title("Server")),
+    condition=HostCondition(),  # Singleton service - no item
 )
 
 
