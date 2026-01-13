@@ -139,6 +139,10 @@ The agent continues collecting data even if individual sections fail. Failed sec
 - Veeam Backup & Replication 13+ with REST API enabled (port 9419)
 - User with REST API access permissions
 
+## Contributors
+
+- [47k](https://github.com/47k) - Thanks for extensive testing of the plugin!
+
 ## License
 
 GPLv2
