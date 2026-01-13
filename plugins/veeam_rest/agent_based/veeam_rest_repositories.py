@@ -159,7 +159,9 @@ def check_veeam_rest_repositories(
     repo_type = repo.get("type", "Unknown")
     capacity_gb = repo.get("capacityGB", 0)
     free_gb = repo.get("freeGB", 0)
-    used_gb = repo.get("usedSpaceGB", 0)
+    # Note: usedSpaceGB from API can be incorrect (shows logical data size, not actual disk usage)
+    # Calculate actual used space from capacity - free for accurate percentage
+    used_gb = capacity_gb - free_gb if capacity_gb > 0 else 0
     is_online = repo.get("isOnline", True)
     is_outdated = repo.get("isOutOfDate", False)
     host_name = repo.get("hostName", "")

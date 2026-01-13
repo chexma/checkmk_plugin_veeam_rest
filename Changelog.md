@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.9] - 2026-01-13
+
+### Fixed
+- Repository usage calculation now uses `capacity - free` instead of `usedSpaceGB` from API
+- Fixes incorrect >100% usage display when Veeam reports logical data size instead of actual disk usage
+
 ## [0.0.8] - 2026-01-12
 
 ### Added
