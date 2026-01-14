@@ -47,6 +47,19 @@ omd restart apache
 - Veeam Backup & Replication 13+ with REST API enabled (port 9419)
 - User with REST API access permissions
 
+## Known Limitations
+
+### REST API Permissions (RBAC)
+
+The Veeam B&R REST API currently lacks granular role-based access control (RBAC). Only predefined roles are available, which are not well suited for monitoring use cases:
+
+- **Veeam Backup Administrator** - Has full access but should not be used for security reasons
+- **Veeam Backup Viewer** - Read-only but lacks access to critical monitoring data (e.g., license information)
+
+There is currently no way to create a dedicated monitoring user with minimal required permissions. As a workaround, you may need to use an Administrator account or accept limited monitoring capabilities with the Viewer role.
+
+Veeam has acknowledged this limitation and is working on a solution, but no timeframe has been provided. See: [Veeam Forums Discussion](https://forums.veeam.com/post561632.html#p561632)
+
 ## Contributors
 
 - [47k](https://github.com/47k) - Thanks for extensive testing of the plugin!
