@@ -101,6 +101,13 @@ metric_backup_size_transferred = Metric(
     color=Color.ORANGE,
 )
 
+metric_backup_speed = Metric(
+    name="backup_speed",
+    title=Title("Backup speed"),
+    unit=UNIT_BYTES_PER_SECOND,
+    color=Color.PURPLE,
+)
+
 
 # =============================================================================
 # GRAPHS
@@ -136,6 +143,13 @@ graph_backup_timing = Graph(
     name="veeam_backup_timing",
     title=Title("Veeam Backup Timing"),
     simple_lines=["backup_duration", "backup_age"],
+    minimal_range=MinimalRange(0, 1),
+)
+
+graph_backup_speed = Graph(
+    name="veeam_backup_speed",
+    title=Title("Veeam Backup Speed"),
+    simple_lines=["backup_speed"],
     minimal_range=MinimalRange(0, 1),
 )
 
