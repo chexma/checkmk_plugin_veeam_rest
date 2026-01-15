@@ -213,7 +213,7 @@ def check_veeam_rest_repositories(
             state=State.OK,
             summary=f"Used: {render.percent(used_percent)}",
         )
-        yield Metric("repository_used_percent", used_percent, boundaries=(0, 100))
+        yield Metric("veeam_rest_repository_used_percent", used_percent, boundaries=(0, 100))
 
     # Check free space levels (lower threshold - alert when free space is LOW)
     free_space_levels = params.get("free_space_levels")
@@ -234,7 +234,7 @@ def check_veeam_rest_repositories(
         yield from check_levels(
             free_bytes,
             levels_lower=levels,
-            metric_name="repository_free",
+            metric_name="veeam_rest_repository_free",
             label="Free",
             render_func=render.disksize,
         )
@@ -246,10 +246,10 @@ def check_veeam_rest_repositories(
     )
 
     # Metrics (repository_free may already be yielded by check_levels above)
-    yield Metric("repository_capacity", capacity_bytes)
+    yield Metric("veeam_rest_repository_capacity", capacity_bytes)
     if not free_space_levels:
-        yield Metric("repository_free", free_bytes)
-    yield Metric("repository_used", used_bytes)
+        yield Metric("veeam_rest_repository_free", free_bytes)
+    yield Metric("veeam_rest_repository_used", used_bytes)
 
     # Additional properties for details
     description = repo.get("description", "")

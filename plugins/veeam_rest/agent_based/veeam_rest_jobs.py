@@ -327,20 +327,20 @@ def check_veeam_rest_jobs(
     # Metrics for graphing
     duration_seconds = parse_duration_to_seconds(duration)
     if duration_seconds is not None:
-        yield Metric("job_duration", duration_seconds)
+        yield Metric("veeam_rest_job_duration", duration_seconds)
 
     if processed_size and processed_size > 0:
-        yield Metric("job_size_processed", processed_size)
+        yield Metric("veeam_rest_job_size_processed", processed_size)
 
     if read_size and read_size > 0:
-        yield Metric("job_size_read", read_size)
+        yield Metric("veeam_rest_job_size_read", read_size)
 
     if transferred_size and transferred_size > 0:
-        yield Metric("job_size_transferred", transferred_size)
+        yield Metric("veeam_rest_job_size_transferred", transferred_size)
 
     speed_bytes = parse_rate_to_bytes_per_second(processing_rate)
     if speed_bytes is not None:
-        yield Metric("job_speed", speed_bytes)
+        yield Metric("veeam_rest_job_speed", speed_bytes)
 
 
 check_plugin_veeam_rest_jobs = CheckPlugin(

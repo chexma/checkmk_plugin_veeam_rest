@@ -204,23 +204,23 @@ def check_veeam_rest_tasks(
 
     # Metrics
     if backup_age is not None:
-        yield Metric("backup_age", backup_age)
+        yield Metric("veeam_rest_backup_age", backup_age)
 
     if duration_seconds is not None:
-        yield Metric("backup_duration", duration_seconds)
+        yield Metric("veeam_rest_backup_duration", duration_seconds)
 
     if processed_size is not None:
-        yield Metric("backup_size_processed", processed_size)
+        yield Metric("veeam_rest_backup_size_processed", processed_size)
 
     if read_size is not None:
-        yield Metric("backup_size_read", read_size)
+        yield Metric("veeam_rest_backup_size_read", read_size)
 
     if transferred_size is not None:
-        yield Metric("backup_size_transferred", transferred_size)
+        yield Metric("veeam_rest_backup_size_transferred", transferred_size)
 
     speed_bytes = parse_rate_to_bytes_per_second(processing_rate)
     if speed_bytes is not None:
-        yield Metric("backup_speed", speed_bytes)
+        yield Metric("veeam_rest_backup_speed", speed_bytes)
 
     # Details
     details_parts = []

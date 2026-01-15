@@ -137,9 +137,9 @@ def check_veeam_rest_wan_accelerators(
         yield Result(state=State.OK, notice=f"Description: {description}")
 
     # Metrics
-    yield Metric("wan_accelerator_cache_size", cache_size_bytes)
+    yield Metric("veeam_rest_wan_accelerator_cache_size", cache_size_bytes)
     if streams_count > 0:
-        yield Metric("wan_accelerator_streams", streams_count)
+        yield Metric("veeam_rest_wan_accelerator_streams", streams_count)
 
 
 check_plugin_veeam_rest_wan_accelerators = CheckPlugin(

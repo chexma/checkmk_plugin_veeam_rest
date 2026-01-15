@@ -153,7 +153,7 @@ def check_veeam_rest_license(
                     state=State.OK,
                     summary=f"License expires in {days_left} days {threshold_info}",
                 )
-            yield Metric("license_days_remaining", days_left)
+            yield Metric("veeam_rest_license_days_remaining", days_left)
 
     # Check support expiration
     support_exp_date = _parse_datetime(support_expiration_date)
@@ -184,7 +184,7 @@ def check_veeam_rest_license(
                     state=State.OK,
                     summary=f"Support contract expires in {support_days_left} days {support_threshold_info}",
                 )
-            yield Metric("support_days_remaining", support_days_left)
+            yield Metric("veeam_rest_support_days_remaining", support_days_left)
 
     # Check instance license usage
     if instance_summary:
@@ -213,9 +213,9 @@ def check_veeam_rest_license(
                     summary=f"Instance usage: {used:.0f}/{licensed:.0f} ({usage_percent:.1f}%) {usage_threshold_info}",
                 )
 
-            yield Metric("license_instances_used", used)
-            yield Metric("license_instances_licensed", licensed)
-            yield Metric("license_instances_usage_percent", usage_percent, boundaries=(0, 100))
+            yield Metric("veeam_rest_license_instances_used", used)
+            yield Metric("veeam_rest_license_instances_licensed", licensed)
+            yield Metric("veeam_rest_license_instances_usage_percent", usage_percent, boundaries=(0, 100))
 
     # Check socket license usage
     if socket_summary:
@@ -228,8 +228,8 @@ def check_veeam_rest_license(
                 state=State.OK,
                 notice=f"Socket usage: {used_sockets}/{licensed_sockets}",
             )
-            yield Metric("license_sockets_used", used_sockets)
-            yield Metric("license_sockets_licensed", licensed_sockets)
+            yield Metric("veeam_rest_license_sockets_used", used_sockets)
+            yield Metric("veeam_rest_license_sockets_licensed", licensed_sockets)
 
     # Check capacity license usage
     if capacity_summary:
@@ -242,8 +242,8 @@ def check_veeam_rest_license(
                 state=State.OK,
                 notice=f"Capacity usage: {used_capacity_tb:.1f}/{licensed_capacity_tb:.1f} TB",
             )
-            yield Metric("license_capacity_used_tb", used_capacity_tb)
-            yield Metric("license_capacity_licensed_tb", licensed_capacity_tb)
+            yield Metric("veeam_rest_license_capacity_used_tb", used_capacity_tb)
+            yield Metric("veeam_rest_license_capacity_licensed_tb", licensed_capacity_tb)
 
     # Details
     details_parts = [

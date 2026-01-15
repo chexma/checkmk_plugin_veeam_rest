@@ -34,28 +34,28 @@ UNIT_TIME = Unit(TimeNotation())
 # =============================================================================
 
 metric_repository_capacity = Metric(
-    name="repository_capacity",
+    name="veeam_rest_repository_capacity",
     title=Title("Repository capacity"),
     unit=UNIT_BYTES,
     color=Color.BLUE,
 )
 
 metric_repository_used = Metric(
-    name="repository_used",
+    name="veeam_rest_repository_used",
     title=Title("Repository used space"),
     unit=UNIT_BYTES,
     color=Color.GREEN,
 )
 
 metric_repository_free = Metric(
-    name="repository_free",
+    name="veeam_rest_repository_free",
     title=Title("Repository free space"),
     unit=UNIT_BYTES,
     color=Color.CYAN,
 )
 
 metric_repository_used_percent = Metric(
-    name="repository_used_percent",
+    name="veeam_rest_repository_used_percent",
     title=Title("Repository usage"),
     unit=UNIT_PERCENTAGE,
     color=Color.ORANGE,
@@ -67,42 +67,42 @@ metric_repository_used_percent = Metric(
 # =============================================================================
 
 metric_backup_age = Metric(
-    name="backup_age",
+    name="veeam_rest_backup_age",
     title=Title("Backup age"),
     unit=UNIT_TIME,
     color=Color.PURPLE,
 )
 
 metric_backup_duration = Metric(
-    name="backup_duration",
+    name="veeam_rest_backup_duration",
     title=Title("Backup duration"),
     unit=UNIT_TIME,
     color=Color.BLUE,
 )
 
 metric_backup_size_processed = Metric(
-    name="backup_size_processed",
+    name="veeam_rest_backup_size_processed",
     title=Title("Processed data"),
     unit=UNIT_BYTES,
     color=Color.GREEN,
 )
 
 metric_backup_size_read = Metric(
-    name="backup_size_read",
+    name="veeam_rest_backup_size_read",
     title=Title("Read data"),
     unit=UNIT_BYTES,
     color=Color.CYAN,
 )
 
 metric_backup_size_transferred = Metric(
-    name="backup_size_transferred",
+    name="veeam_rest_backup_size_transferred",
     title=Title("Transferred data"),
     unit=UNIT_BYTES,
     color=Color.ORANGE,
 )
 
 metric_backup_speed = Metric(
-    name="backup_speed",
+    name="veeam_rest_backup_speed",
     title=Title("Backup speed"),
     unit=UNIT_BYTES_PER_SECOND,
     color=Color.PURPLE,
@@ -114,42 +114,42 @@ metric_backup_speed = Metric(
 # =============================================================================
 
 graph_repository_usage = Graph(
-    name="veeam_repository_usage",
+    name="veeam_rest_repository_usage",
     title=Title("Veeam Repository Usage"),
-    compound_lines=["repository_used"],
-    simple_lines=["repository_capacity"],
+    compound_lines=["veeam_rest_repository_used"],
+    simple_lines=["veeam_rest_repository_capacity"],
     minimal_range=MinimalRange(0, 1),
 )
 
 graph_repository_space = Graph(
-    name="veeam_repository_space",
+    name="veeam_rest_repository_space",
     title=Title("Veeam Repository Space"),
-    compound_lines=["repository_used", "repository_free"],
+    compound_lines=["veeam_rest_repository_used", "veeam_rest_repository_free"],
     minimal_range=MinimalRange(0, 1),
 )
 
 graph_backup_data = Graph(
-    name="veeam_backup_data",
+    name="veeam_rest_backup_data",
     title=Title("Veeam Backup Data Transfer"),
     simple_lines=[
-        "backup_size_processed",
-        "backup_size_read",
-        "backup_size_transferred",
+        "veeam_rest_backup_size_processed",
+        "veeam_rest_backup_size_read",
+        "veeam_rest_backup_size_transferred",
     ],
     minimal_range=MinimalRange(0, 1),
 )
 
 graph_backup_timing = Graph(
-    name="veeam_backup_timing",
+    name="veeam_rest_backup_timing",
     title=Title("Veeam Backup Timing"),
-    simple_lines=["backup_duration", "backup_age"],
+    simple_lines=["veeam_rest_backup_duration", "veeam_rest_backup_age"],
     minimal_range=MinimalRange(0, 1),
 )
 
 graph_backup_speed = Graph(
-    name="veeam_backup_speed",
+    name="veeam_rest_backup_speed",
     title=Title("Veeam Backup Speed"),
-    simple_lines=["backup_speed"],
+    simple_lines=["veeam_rest_backup_speed"],
     minimal_range=MinimalRange(0, 1),
 )
 
@@ -159,9 +159,9 @@ graph_backup_speed = Graph(
 # =============================================================================
 
 perfometer_repository_usage = Perfometer(
-    name="veeam_repository_usage",
+    name="veeam_rest_repository_usage",
     focus_range=FocusRange(Closed(0), Closed(100)),
-    segments=["repository_used_percent"],
+    segments=["veeam_rest_repository_used_percent"],
 )
 
 
@@ -170,35 +170,35 @@ perfometer_repository_usage = Perfometer(
 # =============================================================================
 
 metric_job_duration = Metric(
-    name="job_duration",
+    name="veeam_rest_job_duration",
     title=Title("Job duration"),
     unit=UNIT_TIME,
     color=Color.BLUE,
 )
 
 metric_job_size_processed = Metric(
-    name="job_size_processed",
+    name="veeam_rest_job_size_processed",
     title=Title("Job processed data"),
     unit=UNIT_BYTES,
     color=Color.GREEN,
 )
 
 metric_job_size_read = Metric(
-    name="job_size_read",
+    name="veeam_rest_job_size_read",
     title=Title("Job read data"),
     unit=UNIT_BYTES,
     color=Color.CYAN,
 )
 
 metric_job_size_transferred = Metric(
-    name="job_size_transferred",
+    name="veeam_rest_job_size_transferred",
     title=Title("Job transferred data"),
     unit=UNIT_BYTES,
     color=Color.ORANGE,
 )
 
 metric_job_speed = Metric(
-    name="job_speed",
+    name="veeam_rest_job_speed",
     title=Title("Job processing speed"),
     unit=UNIT_BYTES_PER_SECOND,
     color=Color.PURPLE,
@@ -210,27 +210,27 @@ metric_job_speed = Metric(
 # =============================================================================
 
 graph_job_duration = Graph(
-    name="veeam_job_duration",
+    name="veeam_rest_job_duration",
     title=Title("Veeam Job Duration"),
-    simple_lines=["job_duration"],
+    simple_lines=["veeam_rest_job_duration"],
     minimal_range=MinimalRange(0, 1),
 )
 
 graph_job_data = Graph(
-    name="veeam_job_data",
+    name="veeam_rest_job_data",
     title=Title("Veeam Job Data Transfer"),
     simple_lines=[
-        "job_size_processed",
-        "job_size_read",
-        "job_size_transferred",
+        "veeam_rest_job_size_processed",
+        "veeam_rest_job_size_read",
+        "veeam_rest_job_size_transferred",
     ],
     minimal_range=MinimalRange(0, 1),
 )
 
 graph_job_speed = Graph(
-    name="veeam_job_speed",
+    name="veeam_rest_job_speed",
     title=Title("Veeam Job Speed"),
-    simple_lines=["job_speed"],
+    simple_lines=["veeam_rest_job_speed"],
     minimal_range=MinimalRange(0, 1),
 )
 
@@ -243,63 +243,63 @@ UNIT_DAYS = Unit(DecimalNotation(" days"))
 UNIT_COUNT = Unit(DecimalNotation(""))
 
 metric_license_days_remaining = Metric(
-    name="license_days_remaining",
+    name="veeam_rest_license_days_remaining",
     title=Title("License days remaining"),
     unit=UNIT_DAYS,
     color=Color.GREEN,
 )
 
 metric_support_days_remaining = Metric(
-    name="support_days_remaining",
+    name="veeam_rest_support_days_remaining",
     title=Title("Support days remaining"),
     unit=UNIT_DAYS,
     color=Color.BLUE,
 )
 
 metric_license_instances_used = Metric(
-    name="license_instances_used",
+    name="veeam_rest_license_instances_used",
     title=Title("Instances used"),
     unit=UNIT_COUNT,
     color=Color.ORANGE,
 )
 
 metric_license_instances_licensed = Metric(
-    name="license_instances_licensed",
+    name="veeam_rest_license_instances_licensed",
     title=Title("Instances licensed"),
     unit=UNIT_COUNT,
     color=Color.BLUE,
 )
 
 metric_license_instances_usage_percent = Metric(
-    name="license_instances_usage_percent",
+    name="veeam_rest_license_instances_usage_percent",
     title=Title("Instance usage"),
     unit=UNIT_PERCENTAGE,
     color=Color.PURPLE,
 )
 
 metric_license_sockets_used = Metric(
-    name="license_sockets_used",
+    name="veeam_rest_license_sockets_used",
     title=Title("Sockets used"),
     unit=UNIT_COUNT,
     color=Color.ORANGE,
 )
 
 metric_license_sockets_licensed = Metric(
-    name="license_sockets_licensed",
+    name="veeam_rest_license_sockets_licensed",
     title=Title("Sockets licensed"),
     unit=UNIT_COUNT,
     color=Color.BLUE,
 )
 
 metric_license_capacity_used_tb = Metric(
-    name="license_capacity_used_tb",
+    name="veeam_rest_license_capacity_used_tb",
     title=Title("Capacity used (TB)"),
     unit=Unit(DecimalNotation(" TB")),
     color=Color.ORANGE,
 )
 
 metric_license_capacity_licensed_tb = Metric(
-    name="license_capacity_licensed_tb",
+    name="veeam_rest_license_capacity_licensed_tb",
     title=Title("Capacity licensed (TB)"),
     unit=Unit(DecimalNotation(" TB")),
     color=Color.BLUE,
@@ -311,14 +311,14 @@ metric_license_capacity_licensed_tb = Metric(
 # =============================================================================
 
 metric_wan_accelerator_cache_size = Metric(
-    name="wan_accelerator_cache_size",
+    name="veeam_rest_wan_accelerator_cache_size",
     title=Title("WAN accelerator cache size"),
     unit=UNIT_BYTES,
     color=Color.BLUE,
 )
 
 metric_wan_accelerator_streams = Metric(
-    name="wan_accelerator_streams",
+    name="veeam_rest_wan_accelerator_streams",
     title=Title("WAN accelerator streams"),
     unit=UNIT_COUNT,
     color=Color.GREEN,
@@ -330,16 +330,16 @@ metric_wan_accelerator_streams = Metric(
 # =============================================================================
 
 graph_license_expiration = Graph(
-    name="veeam_license_expiration",
+    name="veeam_rest_license_expiration",
     title=Title("Veeam License Expiration"),
-    simple_lines=["license_days_remaining", "support_days_remaining"],
+    simple_lines=["veeam_rest_license_days_remaining", "veeam_rest_support_days_remaining"],
     minimal_range=MinimalRange(0, 1),
 )
 
 graph_license_instance_usage = Graph(
-    name="veeam_license_instance_usage",
+    name="veeam_rest_license_instance_usage",
     title=Title("Veeam License Instance Usage"),
-    simple_lines=["license_instances_used", "license_instances_licensed"],
+    simple_lines=["veeam_rest_license_instances_used", "veeam_rest_license_instances_licensed"],
     minimal_range=MinimalRange(0, 1),
 )
 
@@ -349,7 +349,7 @@ graph_license_instance_usage = Graph(
 # =============================================================================
 
 perfometer_license_instance_usage = Perfometer(
-    name="veeam_license_instance_usage",
+    name="veeam_rest_license_instance_usage",
     focus_range=FocusRange(Closed(0), Closed(100)),
-    segments=["license_instances_usage_percent"],
+    segments=["veeam_rest_license_instances_usage_percent"],
 )
