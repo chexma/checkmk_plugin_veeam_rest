@@ -2,6 +2,49 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.18] - 2026-01-15
+
+### Changed
+- Moved all helper functions to shared `lib.py`:
+  - `parse_rate_to_bytes_per_second()` - rate string parsing
+  - `parse_duration_to_seconds()` - duration string parsing
+  - `format_duration_hms()` - duration formatting
+- Jobs and Tasks checks now import all helpers from shared library
+
+## [0.0.17] - 2026-01-15
+
+### Changed
+- Refactored shared helper functions to `lib.py` (DRY principle)
+- `parse_rate_to_bytes_per_second()` now in shared library
+- Jobs and Tasks checks import from `cmk_addons.plugins.veeam_rest.lib`
+
+## [0.0.16] - 2026-01-15
+
+### Added
+- Backup speed metric (`backup_speed`) for Tasks/Backup services
+- New "Veeam Backup Speed" graph for per-VM backup throughput
+- Speed metric parsing for Tasks (same as Jobs)
+
+## [0.0.15] - 2026-01-15
+
+### Added
+- Known Limitations section in README about REST API RBAC issues
+- Documentation of Veeam's predefined roles limitations for monitoring
+- Link to Veeam forum discussion about RBAC improvements
+
+## [0.0.14] - 2026-01-13
+
+### Removed
+- Partial failure handling code from special agent
+- `<<<veeam_rest_errors>>>` section output
+- Let Checkmk handle missing sections natively
+
+## [0.0.13] - 2026-01-13
+
+### Added
+- Contributors section in README
+- Credit to [47k](https://github.com/47k) for extensive testing
+
 ## [0.0.12] - 2026-01-13
 
 ### Added
