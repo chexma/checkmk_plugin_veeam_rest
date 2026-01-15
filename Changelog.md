@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.20] - 2026-01-15
+
+### Fixed
+- Fixed speed metric parsing for Veeam API responses without `/s` suffix
+- API returns `"131,9 MB"` instead of `"131,9 MB/s"` - parser now handles both formats
+- Speed values now correctly display as MB/s or GB/s instead of B/s
+
+## [0.0.19] - 2026-01-15
+
+### Changed
+- Renamed all metrics with `veeam_rest_` prefix to avoid naming conflicts with Checkmk core metrics
+- Affected metrics:
+  - Repository: `veeam_rest_repository_capacity`, `veeam_rest_repository_used`, `veeam_rest_repository_free`, `veeam_rest_repository_used_percent`
+  - Jobs: `veeam_rest_job_duration`, `veeam_rest_job_size_processed`, `veeam_rest_job_size_read`, `veeam_rest_job_size_transferred`, `veeam_rest_job_speed`
+  - Tasks: `veeam_rest_backup_age`, `veeam_rest_backup_duration`, `veeam_rest_backup_size_processed`, `veeam_rest_backup_size_read`, `veeam_rest_backup_size_transferred`, `veeam_rest_backup_speed`
+  - License: `veeam_rest_license_days_remaining`, `veeam_rest_support_days_remaining`, `veeam_rest_license_instances_used`, `veeam_rest_license_instances_licensed`, `veeam_rest_license_instances_usage_percent`, `veeam_rest_license_sockets_used`, `veeam_rest_license_sockets_licensed`, `veeam_rest_license_capacity_used_tb`, `veeam_rest_license_capacity_licensed_tb`
+  - WAN Accelerators: `veeam_rest_wan_accelerator_cache_size`, `veeam_rest_wan_accelerator_streams`
+
+### Fixed
+- Resolved metric naming conflict during Checkmk upgrade where `backup_age`, `backup_duration`, `job_duration` were already defined in Checkmk core
+
 ## [0.0.18] - 2026-01-15
 
 ### Changed
