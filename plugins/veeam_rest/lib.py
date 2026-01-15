@@ -5,7 +5,10 @@ Shared utility functions for Veeam REST monitoring plugin.
 
 
 def parse_rate_to_bytes_per_second(rate_str: str) -> float | None:
-    """Parse rate string like '1,1 GB/s' or '500 MB/s' to bytes/second."""
+    """Parse rate string like '1,1 GB/s', '500 MB/s', or '131,9 MB' to bytes/second.
+
+    Note: Veeam API may return rate without '/s' suffix (e.g., '131,9 MB').
+    """
     if not rate_str:
         return None
     try:
@@ -16,12 +19,18 @@ def parse_rate_to_bytes_per_second(rate_str: str) -> float | None:
             return None
         value = float(parts[0])
         unit = parts[1].upper()
+        # Support both "MB/S" and "MB" formats (Veeam API inconsistency)
         multipliers = {
             "B/S": 1,
             "KB/S": 1024,
             "MB/S": 1024**2,
             "GB/S": 1024**3,
             "TB/S": 1024**4,
+            "B": 1,
+            "KB": 1024,
+            "MB": 1024**2,
+            "GB": 1024**3,
+            "TB": 1024**4,
         }
         return value * multipliers.get(unit, 1)
     except (ValueError, IndexError):
