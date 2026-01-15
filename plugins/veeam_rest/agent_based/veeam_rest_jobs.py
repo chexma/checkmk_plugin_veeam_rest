@@ -22,6 +22,11 @@ from cmk.agent_based.v2 import (
     render,
 )
 
+from cmk_addons.plugins.veeam_rest.lib import (
+    parse_duration_to_seconds,
+    parse_rate_to_bytes_per_second,
+)
+
 
 # =============================================================================
 # SECTION PARSING
@@ -153,54 +158,6 @@ STATE_MAP = {
     "warn": State.WARN,
     "crit": State.CRIT,
 }
-
-
-def _parse_duration_to_seconds(duration_str: str) -> int | None:
-    """Parse duration string like '00:03:26' or '1.00:03:26' to seconds."""
-    if not duration_str:
-        return None
-    try:
-        parts = duration_str.split(":")
-        if len(parts) == 3:
-            # Check if first part contains days (e.g., "1.00")
-            hours_part = parts[0]
-            if "." in hours_part:
-                days_str, hours_str = hours_part.split(".", 1)
-                days = int(days_str)
-                hours = int(hours_str)
-            else:
-                days = 0
-                hours = int(hours_part)
-            minutes = int(parts[1])
-            seconds = int(parts[2])
-            return days * 86400 + hours * 3600 + minutes * 60 + seconds
-    except (ValueError, IndexError):
-        pass
-    return None
-
-
-def _parse_rate_to_bytes_per_second(rate_str: str) -> float | None:
-    """Parse rate string like '1,1 GB/s' or '500 MB/s' to bytes/second."""
-    if not rate_str:
-        return None
-    try:
-        # Handle European decimal format (1,1 -> 1.1)
-        rate_str = rate_str.replace(",", ".")
-        parts = rate_str.split()
-        if len(parts) != 2:
-            return None
-        value = float(parts[0])
-        unit = parts[1].upper()
-        multipliers = {
-            "B/S": 1,
-            "KB/S": 1024,
-            "MB/S": 1024**2,
-            "GB/S": 1024**3,
-            "TB/S": 1024**4,
-        }
-        return value * multipliers.get(unit, 1)
-    except (ValueError, IndexError):
-        return None
 
 
 def _get_result_state(result: str, params: Mapping[str, Any]) -> State:
@@ -368,7 +325,7 @@ def check_veeam_rest_jobs(
         yield Result(state=State.OK, notice=f"Flags: {', '.join(flags)}")
 
     # Metrics for graphing
-    duration_seconds = _parse_duration_to_seconds(duration)
+    duration_seconds = parse_duration_to_seconds(duration)
     if duration_seconds is not None:
         yield Metric("job_duration", duration_seconds)
 
@@ -381,7 +338,7 @@ def check_veeam_rest_jobs(
     if transferred_size and transferred_size > 0:
         yield Metric("job_size_transferred", transferred_size)
 
-    speed_bytes = _parse_rate_to_bytes_per_second(processing_rate)
+    speed_bytes = parse_rate_to_bytes_per_second(processing_rate)
     if speed_bytes is not None:
         yield Metric("job_speed", speed_bytes)
 

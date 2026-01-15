@@ -24,6 +24,11 @@ from cmk.agent_based.v2 import (
     render,
 )
 
+from cmk_addons.plugins.veeam_rest.lib import (
+    format_duration_hms,
+    parse_rate_to_bytes_per_second,
+)
+
 
 # =============================================================================
 # SECTION PARSING
@@ -102,13 +107,6 @@ STATE_MAP = {
 }
 
 
-def _format_duration_hms(seconds: int) -> str:
-    """Format duration as HH:MM:SS."""
-    hours, remainder = divmod(int(seconds), 3600)
-    minutes, secs = divmod(remainder, 60)
-    return f"{hours:02d}:{minutes:02d}:{secs:02d}"
-
-
 def _get_latest_task(item: str, section: Section) -> dict | None:
     """Find the most recent task for an item."""
     latest_task = None
@@ -176,7 +174,7 @@ def check_veeam_rest_tasks(
     else:
         # Add duration and processed size for completed tasks
         if duration_seconds is not None:
-            summary_parts.append(f"Last Duration: {_format_duration_hms(duration_seconds)}")
+            summary_parts.append(f"Last Duration: {format_duration_hms(duration_seconds)}")
         if processed_size is not None:
             summary_parts.append(f"Processed: {render.bytes(processed_size)}")
 
@@ -219,6 +217,10 @@ def check_veeam_rest_tasks(
 
     if transferred_size is not None:
         yield Metric("backup_size_transferred", transferred_size)
+
+    speed_bytes = parse_rate_to_bytes_per_second(processing_rate)
+    if speed_bytes is not None:
+        yield Metric("backup_speed", speed_bytes)
 
     # Details
     details_parts = []
