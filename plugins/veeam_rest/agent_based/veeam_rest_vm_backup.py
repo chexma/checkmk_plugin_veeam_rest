@@ -3,7 +3,8 @@
 Check plugin for Veeam VM/Agent Backup status via piggyback.
 
 This check receives backup status data attached to monitored VMs/computers
-via Checkmk's piggyback mechanism. Data comes from the backupObjects API.
+via Checkmk's piggyback mechanism. Data comes from the backupObjects API,
+enriched with task data for VM backups.
 """
 
 import json
@@ -22,6 +23,11 @@ from cmk.agent_based.v2 import (
     StringTable,
     check_levels,
     render,
+)
+
+from cmk_addons.plugins.veeam_rest.lib import (
+    format_duration_hms,
+    parse_rate_to_bytes_per_second,
 )
 
 
@@ -121,14 +127,54 @@ def check_veeam_rest_vm_backup(
             label="Backup age",
         )
 
-    # Latest restore point details
+    # Task data (available for VM backups only, not agent backups)
+    task_data = section.get("taskData")
+    if task_data:
+        progress = task_data.get("progress") or {}
+
+        # Processed size from task (more accurate than restore point)
+        processed_size = progress.get("processedSize")
+        if processed_size is not None:
+            yield Result(state=State.OK, summary=f"Processed: {render.bytes(processed_size)}")
+            yield Metric("veeam_rest_backup_size_processed", processed_size)
+
+        # Duration from task
+        duration = task_data.get("durationSeconds")
+        if duration is not None:
+            yield Result(state=State.OK, summary=f"Duration: {format_duration_hms(duration)}")
+            yield Metric("veeam_rest_backup_duration", duration)
+
+        # Speed/processing rate
+        rate = progress.get("processingRate")
+        if rate:
+            speed = parse_rate_to_bytes_per_second(rate)
+            if speed is not None:
+                yield Result(state=State.OK, notice=f"Speed: {render.iobandwidth(speed)}")
+                yield Metric("veeam_rest_backup_speed", speed)
+
+        # Bottleneck
+        bottleneck = progress.get("bottleneck")
+        if bottleneck and bottleneck not in ("NotDefined", "Unknown"):
+            yield Result(state=State.OK, notice=f"Bottleneck: {bottleneck}")
+
+        # Additional size metrics from task
+        read_size = progress.get("readSize")
+        if read_size is not None:
+            yield Metric("veeam_rest_backup_size_read", read_size)
+
+        transferred_size = progress.get("transferredSize")
+        if transferred_size is not None:
+            yield Metric("veeam_rest_backup_size_transferred", transferred_size)
+
+    # Latest restore point details (fallback for size if no task data)
     latest_rp = section.get("latestRestorePoint")
     if latest_rp:
-        # Size from restore point
-        original_size = latest_rp.get("originalSize")
-        if original_size is not None:
-            yield Result(state=State.OK, summary=f"Size: {render.bytes(original_size)}")
-            yield Metric("veeam_rest_backup_size_processed", original_size)
+        # Size from restore point (only if no task data provided processedSize)
+        if not task_data or not (task_data.get("progress") or {}).get("processedSize"):
+            original_size = latest_rp.get("originalSize")
+            if original_size is not None:
+                yield Result(state=State.OK, summary=f"Size: {render.bytes(original_size)}")
+                yield Metric("veeam_rest_backup_size_processed", original_size)
 
         # Malware status
         malware_status = latest_rp.get("malwareStatus")

@@ -518,18 +518,50 @@ def enrich_task_data(tasks: list[dict], server_name: str, job_type_lookup: dict[
     return tasks
 
 
-def enrich_backup_objects(api: VeeamRestAPI, objects: list[dict], server_name: str) -> list[dict]:
-    """Enrich backup objects with restore point info and calculated fields.
+def enrich_backup_objects(
+    api: VeeamRestAPI,
+    objects: list[dict],
+    server_name: str,
+    tasks: list[dict] | None = None,
+) -> list[dict]:
+    """Enrich backup objects with restore point info, task data, and calculated fields.
 
-    For each backup object, fetches the latest restore point to determine:
-    - backupAgeSeconds: Time since last backup
+    For each backup object:
+    - backupServer: The Veeam server name
+    - backupAgeSeconds: Time since last backup (from restore points)
     - latestRestorePoint: Full restore point data
+    - taskData: Task details for VM backups (duration, speed, bottleneck)
     """
     now = datetime.now(timezone.utc)
+
+    # Build task lookup by name (lowercase for case-insensitive matching)
+    # Keep only the most recent task per object name
+    task_by_name: dict[str, dict] = {}
+    if tasks:
+        for task in tasks:
+            task_name = task.get("name", "").lower()
+            if task_name:
+                existing = task_by_name.get(task_name)
+                if not existing or task.get("endTime", "") > existing.get("endTime", ""):
+                    task_by_name[task_name] = task
 
     for obj in objects:
         obj["backupServer"] = server_name
         object_id = obj.get("id")
+
+        # Try to merge task data if available (VM backups only)
+        obj_name = obj.get("name", "").lower()
+        if obj_name and obj_name in task_by_name:
+            task = task_by_name[obj_name]
+            obj["taskData"] = {
+                "state": task.get("state"),
+                "result": task.get("result"),
+                "progress": task.get("progress"),
+                "durationSeconds": task.get("durationSeconds"),
+                "sessionId": task.get("sessionId"),
+                "endTime": task.get("endTime"),
+            }
+
         if not object_id:
             continue
 
@@ -822,7 +854,15 @@ def main() -> int:
         if args.piggyback_vms:
             try:
                 backup_objects = api.get_backup_objects()
-                backup_objects = enrich_backup_objects(api, backup_objects, server_name)
+
+                # Fetch tasks for enrichment (only available for VM backups)
+                tasks = None
+                try:
+                    tasks = api.get_task_sessions(created_after)
+                except VeeamAPIError:
+                    pass  # Tasks not available, continue without
+
+                backup_objects = enrich_backup_objects(api, backup_objects, server_name, tasks)
                 output_piggyback_backup_objects(backup_objects, redactor)
             except VeeamAPIError as e:
                 if args.debug:

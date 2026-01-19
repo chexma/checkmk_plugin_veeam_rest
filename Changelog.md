@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.25] - 2026-01-19
+
+### Added
+- **Hybrid piggyback enrichment**: VM backups now include task data with richer metrics
+  - Duration, processing speed, bottleneck info from task sessions
+  - Additional size metrics (read size, transferred size)
+  - Agent backups continue to work with backupObjects data only
+
 ## [0.0.24] - 2026-01-15
 
 ### Added
