@@ -64,6 +64,7 @@ JOB_TYPE_CATEGORY = {
     "VSphereReplica": "VMware Replica",
     # Hyper-V
     "HyperVBackup": "Hyper-V Backup",
+    "HyperVReplica": "Hyper-V Replica",
     # Cloud Director
     "CloudDirectorBackup": "vCD Backup",
     # Entra ID (Azure AD)
