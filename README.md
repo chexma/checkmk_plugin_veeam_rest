@@ -60,6 +60,19 @@ There is currently no way to create a dedicated monitoring user with minimal req
 
 Veeam has acknowledged this limitation and is working on a solution, but no timeframe has been provided. See: [Veeam Forums Discussion](https://forums.veeam.com/post561632.html#p561632)
 
+### Task Sessions for Agent Backups
+
+The Veeam REST API `/api/v1/taskSessions` endpoint does **not** return data for **Windows/Linux Agent Backups**. Task sessions are only populated for VM-based backups (vSphere, Hyper-V, etc.).
+
+**Impact:** "Veeam Backup {hostname}" services will show UNKNOWN for agent-based backups because no task session data is available.
+
+**Workaround:** Use the **Job services** ("Veeam Job Windows Agent - {jobname}") instead, which correctly show status, duration, and result for agent backup jobs. If you have discovered task services for agent backups, remove them with:
+
+```bash
+cmk -II hostname  # Re-discover services
+cmk -R
+```
+
 ## Contributors
 
 - [47k](https://github.com/47k) - Thanks for extensive testing of the plugin!

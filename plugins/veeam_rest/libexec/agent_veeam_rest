@@ -407,6 +407,14 @@ class VeeamRestAPI:
         """Get all WAN accelerators."""
         return self._get_paginated("/api/v1/backupInfrastructure/wanAccelerators")
 
+    def get_backup_objects(self) -> list[dict]:
+        """Get all backup objects (VMs, agents, etc.)."""
+        return self._get_paginated("/api/v1/backupObjects")
+
+    def get_object_restore_points(self, object_id: str) -> list[dict]:
+        """Get restore points for a specific backup object."""
+        return self._get_paginated(f"/api/v1/backupObjects/{object_id}/restorePoints")
+
 
 # =============================================================================
 # OUTPUT FUNCTIONS
@@ -457,12 +465,24 @@ def enrich_job_data(jobs: list[dict], server_name: str) -> list[dict]:
     return jobs
 
 
-def enrich_task_data(tasks: list[dict], server_name: str) -> list[dict]:
-    """Enrich task session data with calculated fields."""
+def enrich_task_data(tasks: list[dict], server_name: str, job_type_lookup: dict[str, str] | None = None) -> list[dict]:
+    """Enrich task session data with calculated fields.
+
+    Args:
+        tasks: List of task session dicts from API
+        server_name: Backup server name
+        job_type_lookup: Optional mapping of sessionId -> jobType
+    """
     now = datetime.now(timezone.utc)
 
     for task in tasks:
         task["backupServer"] = server_name
+
+        # Add job type if lookup provided (for filtering agent backups)
+        if job_type_lookup:
+            session_id = task.get("sessionId")
+            if session_id and session_id in job_type_lookup:
+                task["jobType"] = job_type_lookup[session_id]
 
         # Calculate backup age if endTime exists
         end_time = task.get("endTime")
@@ -496,6 +516,69 @@ def enrich_task_data(tasks: list[dict], server_name: str) -> list[dict]:
                     task["durationSeconds"] = None
 
     return tasks
+
+
+def enrich_backup_objects(api: VeeamRestAPI, objects: list[dict], server_name: str) -> list[dict]:
+    """Enrich backup objects with restore point info and calculated fields.
+
+    For each backup object, fetches the latest restore point to determine:
+    - backupAgeSeconds: Time since last backup
+    - latestRestorePoint: Full restore point data
+    """
+    now = datetime.now(timezone.utc)
+
+    for obj in objects:
+        obj["backupServer"] = server_name
+        object_id = obj.get("id")
+        if not object_id:
+            continue
+
+        try:
+            # Get restore points for this object
+            restore_points = api.get_object_restore_points(object_id)
+            if restore_points:
+                # Find the latest restore point by creation time
+                latest = max(restore_points, key=lambda r: r.get("creationTime", ""))
+                obj["latestRestorePoint"] = latest
+
+                # Calculate backup age
+                creation_time = latest.get("creationTime")
+                if creation_time:
+                    try:
+                        dt = datetime.fromisoformat(creation_time.replace("Z", "+00:00"))
+                        obj["backupAgeSeconds"] = int((now - dt).total_seconds())
+                    except (ValueError, TypeError):
+                        obj["backupAgeSeconds"] = None
+        except VeeamAPIError:
+            # Skip enrichment if restore points can't be fetched
+            pass
+
+    return objects
+
+
+def output_piggyback_backup_objects(objects: list[dict], redactor: VeeamRedactor | None = None) -> None:
+    """Output backup objects as piggyback sections for each VM/computer.
+
+    Each backup object becomes a piggyback section attached to the hostname.
+    Works for both VM backups and agent backups.
+    """
+    for obj in objects:
+        hostname = obj.get("name")
+        if not hostname:
+            continue
+
+        # Normalize hostname for Checkmk (lowercase, no special chars)
+        piggyback_hostname = hostname.lower().replace(" ", "_")
+
+        if redactor:
+            obj = redactor.redact_dict(obj)
+
+        # Start piggyback section
+        print(f"<<<<{piggyback_hostname}>>>>")
+        print("<<<veeam_rest_vm_backup:sep(0)>>>")
+        print(json.dumps(obj))
+        # End piggyback section
+        print("<<<<>>>>")
 
 
 # =============================================================================
@@ -543,8 +626,13 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--sections",
         nargs="*",
-        default=["jobs", "tasks", "repositories", "proxies"],
-        help="Sections to collect"
+        default=["jobs", "repositories", "proxies"],
+        help="Sections to collect (tasks removed from default, use --piggyback-vms instead)"
+    )
+    parser.add_argument(
+        "--piggyback-vms",
+        action="store_true",
+        help="Create piggyback data for VM/object backups (attached to monitored hosts)"
     )
     parser.add_argument(
         "--session-age",
@@ -708,10 +796,38 @@ def main() -> int:
                 tasks, timestamp = cached
                 output_section("tasks", tasks, redactor, timestamp, cache_interval)
             else:
+                # Build job type lookup: sessionId -> jobType
+                # This allows filtering out agent backup tasks in discovery
+                job_type_lookup: dict[str, str] = {}
+                try:
+                    sessions = api.get_sessions(created_after)
+                    jobs = api.get_job_states()
+                    # Build jobId -> jobType map
+                    job_types = {job.get("id"): job.get("type") for job in jobs}
+                    # Build sessionId -> jobType map
+                    for session in sessions:
+                        session_id = session.get("id")
+                        job_id = session.get("jobId")
+                        if session_id and job_id and job_id in job_types:
+                            job_type_lookup[session_id] = job_types[job_id]
+                except VeeamAPIError:
+                    pass  # Continue without job type info
+
                 tasks = api.get_task_sessions(created_after)
-                tasks = enrich_task_data(tasks, server_name)
+                tasks = enrich_task_data(tasks, server_name, job_type_lookup)
                 timestamp = store_cached_section(hostname_for_cache, "tasks", tasks) if cache_interval else None
                 output_section("tasks", tasks, redactor, timestamp, cache_interval)
+
+        # Piggyback output for backup objects (VMs and agent backups)
+        if args.piggyback_vms:
+            try:
+                backup_objects = api.get_backup_objects()
+                backup_objects = enrich_backup_objects(api, backup_objects, server_name)
+                output_piggyback_backup_objects(backup_objects, redactor)
+            except VeeamAPIError as e:
+                if args.debug:
+                    raise
+                sys.stderr.write(f"Failed to fetch backup objects for piggyback: {e}\n")
 
         if "sessions" in args.sections:
             cache_interval = cache_config.sessions

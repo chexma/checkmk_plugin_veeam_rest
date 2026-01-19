@@ -2,6 +2,47 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.24] - 2026-01-15
+
+### Added
+- Added `HyperVReplica` job type mapping for Hyper-V replication jobs
+
+## [0.0.23] - 2026-01-15
+
+### Changed
+- **Piggyback now uses backupObjects API**: Switched from taskSessions to backupObjects endpoint
+  - Works for ALL backup types (VMs AND Agent Backups)
+  - Previously only VM backups generated piggyback data
+- New fields available in backup status:
+  - `lastRunFailed` - determines backup success/failure
+  - `restorePointsCount` - number of available restore points
+  - `type` and `platformName` - backup object type info
+  - `originalSize` - size from latest restore point
+  - `malwareStatus` - malware scan result from restore point
+
+### Fixed
+- Piggyback data now generated for Windows/Linux Agent Backups (not just VM backups)
+
+## [0.0.22] - 2026-01-15
+
+### Added
+- **Piggyback support for VM backups**: New `--piggyback-vms` option attaches backup status to monitored VMs instead of creating services on the Veeam server
+- New check plugin `veeam_rest_vm_backup` for processing piggyback backup data
+- New ruleset option "Create Piggyback Data for VM Backups" in special agent configuration
+
+### Changed
+- Removed "tasks" from default sections (use piggyback instead for VM-level monitoring)
+- Tasks section marked as legacy in ruleset UI
+
+### Removed
+- Removed `veeam_rest_tasks` check plugin (replaced by piggyback mechanism)
+
+## [0.0.21] - 2026-01-15
+
+### Added
+- Documented limitation: Task sessions not available for Agent Backups (Windows/Linux)
+- Added workaround guidance to use Job services instead of Task services for agent backups
+
 ## [0.0.20] - 2026-01-15
 
 ### Fixed

@@ -52,9 +52,13 @@ def _agent_arguments(
         args.extend(["--timeout", str(params["timeout"])])
 
     # Sections to collect
-    sections = params.get("sections", ["jobs", "tasks", "repositories", "proxies"])
+    sections = params.get("sections", ["jobs", "repositories", "proxies"])
     if sections:
         args.extend(["--sections"] + list(sections))
+
+    # Piggyback for VM backups
+    if params.get("piggyback_vms", False):
+        args.append("--piggyback-vms")
 
     # Session age filter
     if "session_age" in params:

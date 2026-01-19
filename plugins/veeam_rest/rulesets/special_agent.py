@@ -97,7 +97,7 @@ def _parameter_form() -> Dictionary:
                         ),
                         MultipleChoiceElement(
                             name="tasks",
-                            title=Title("Task Sessions (per-VM details)"),
+                            title=Title("Task Sessions (per-VM details) - Legacy, use Piggyback instead"),
                         ),
                         MultipleChoiceElement(
                             name="sessions",
@@ -132,7 +132,22 @@ def _parameter_form() -> Dictionary:
                             title=Title("WAN Accelerators"),
                         ),
                     ],
-                    prefill=DefaultValue(["jobs", "tasks", "repositories", "proxies"]),
+                    prefill=DefaultValue(["jobs", "repositories", "proxies"]),
+                ),
+            ),
+            # Piggyback options
+            "piggyback_vms": DictElement(
+                required=False,
+                parameter_form=BooleanChoice(
+                    title=Title("Create Piggyback Data for VM Backups"),
+                    label=Title("Attach backup status to monitored VMs"),
+                    help_text=Help(
+                        "When enabled, backup status is attached as piggyback data to the "
+                        "monitored VM hosts instead of creating services on the Veeam server. "
+                        "The VM hostname in Veeam must match the Checkmk hostname. "
+                        "Note: Only works for VM-based backups (vSphere, Hyper-V), not agent backups."
+                    ),
+                    prefill=DefaultValue(False),
                 ),
             ),
             # Filtering options
