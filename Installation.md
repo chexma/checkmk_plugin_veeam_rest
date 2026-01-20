@@ -62,16 +62,7 @@ The REST API is enabled by default in Veeam B&R 13+. Verify it's running:
 
 ### Create a Monitoring User
 
-For security, create a dedicated user for monitoring:
-
-**Option A: Local Windows User**
-```powershell
-# On Veeam server (PowerShell as Admin)
-New-LocalUser -Name "veeam_monitor" -Password (ConvertTo-SecureString "SecurePassword123!" -AsPlainText -Force) -PasswordNeverExpires
-```
-
-**Option B: Active Directory User**
-- Create a service account in AD (e.g., `SVC_VeeamMonitor`)
+For security, create a dedicated, local user for monitoring.
 
 ### Assign Veeam Permissions
 
@@ -89,7 +80,21 @@ New-LocalUser -Name "veeam_monitor" -Password (ConvertTo-SecureString "SecurePas
 3. Configure appropriate agent settings (can use "No API integrations, no Checkmk agent")
 4. Save the host
 
-## Step 5: Configure the Special Agent
+## Step 5: Store Password in Password Store (Recommended)
+
+For security, store the Veeam user password in Checkmk's password store instead of entering it directly in the rule:
+
+1. Go to **Setup > General > Passwords**
+2. Click **Add password**
+3. Configure:
+   - **Unique ID**: `veeam_rest_api` (or similar)
+   - **Title**: `Veeam REST API`
+   - **Password**: Enter the Veeam monitoring user password
+4. Save
+
+> **Why use the password store?** Passwords in the store are encrypted at rest and not visible in the rule configuration. This prevents accidental exposure when sharing configurations or taking screenshots.
+
+## Step 6: Configure the Special Agent
 
 1. Go to **Setup > Agents > Other integrations > Veeam Backup & Replication (REST API)**
 2. Click **Add rule**
@@ -99,8 +104,8 @@ New-LocalUser -Name "veeam_monitor" -Password (ConvertTo-SecureString "SecurePas
 |---------|-------|
 | **Hostname/IP** | Veeam server address |
 | **Port** | 9419 (default) |
-| **Username** | `DOMAIN\username` or `username@domain` |
-| **Password** | User password |
+| **Username** | `username` |
+| **Password** | Select "From password store" and choose `veeam_rest_api` |
 | **SSL Verification** | Disable if using self-signed certificate |
 
 4. Select **Sections to Collect**:
@@ -122,14 +127,14 @@ New-LocalUser -Name "veeam_monitor" -Password (ConvertTo-SecureString "SecurePas
 
 8. Save the rule
 
-## Step 6: Run Service Discovery
+## Step 7: Run Service Discovery
 
 1. Go to your Veeam host in Checkmk
 2. Click **Run service discovery**
 3. Accept the discovered services
 4. Activate changes
 
-## Step 7: Verify the Setup
+## Step 8: Verify the Setup
 
 Check that services are discovered:
 

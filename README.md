@@ -20,32 +20,6 @@ Checkmk 2.4 plugin for monitoring Veeam Backup & Replication (Version 13 and abo
 
 See [Installation Guide](installation.md) for detailed setup instructions including Veeam user configuration and troubleshooting.
 
-## Configuration
-
-1. **Setup > Agents > Other integrations > Veeam Backup & Replication (REST API)**
-2. Configure:
-   - Hostname/IP and credentials (DOMAIN\user or user@domain)
-   - Sections to collect (Jobs, Repositories, Proxies, etc.)
-   - Backup Services mode (Disabled, Attach to Hosts, Attach to Backup Server)
-   - Malware Services mode (Disabled, Attach to Hosts, Attach to Backup Server)
-3. Run service discovery on the Veeam host
-
-### Service Output Modes
-
-**Backup Services:**
-| Mode | Description |
-|------|-------------|
-| Disabled | No backup object services created |
-| Attach to Hosts | Piggyback services on monitored VMs/computers |
-| Attach to Backup Server | Services directly on Veeam server |
-
-**Malware Services:**
-| Mode | Description |
-|------|-------------|
-| Disabled | No malware services created |
-| Attach to Hosts | Piggyback services on affected machines |
-| Attach to Backup Server | Services directly on Veeam server |
-
 ## Services Created
 
 | Service | Description |
