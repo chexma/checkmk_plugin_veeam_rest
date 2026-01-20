@@ -33,8 +33,6 @@ logger = logging.getLogger("agent_veeam_rest")
 class CachePerSection:
     """Cache intervals per section in seconds. None = no caching."""
     jobs: int | None = 300              # 5 minutes
-    tasks: int | None = 60              # 1 minute
-    sessions: int | None = 300          # 5 minutes
     repositories: int | None = 1800     # 30 minutes
     proxies: int | None = 3600          # 1 hour
     managed_servers: int | None = 3600  # 1 hour
@@ -43,6 +41,7 @@ class CachePerSection:
     scaleout_repositories: int | None = 1800  # 30 minutes
     wan_accelerators: int | None = 3600  # 1 hour
     malware_events: int | None = 300    # 5 minutes
+    malware_combined: int | None = 300  # 5 minutes (for --malware-mode)
 
 
 def get_cache_dir() -> Path:
@@ -464,6 +463,18 @@ class VeeamRestAPI:
         """Get restore points for a specific backup object."""
         return self._get_paginated(f"/api/v1/backupObjects/{object_id}/restorePoints")
 
+    def get_all_restore_points(self) -> list[dict]:
+        """Get all restore points from the backup server.
+
+        This is much more efficient than calling get_object_restore_points()
+        for each object individually. For 500 VMs, this reduces API calls
+        from ~500 to ~1-5 (paginated).
+
+        Returns restore points with: id, name, creationTime, malwareStatus, backupId, etc.
+        The 'name' field contains the object name for matching.
+        """
+        return self._get_paginated("/api/v1/restorePoints")
+
     def get_malware_events(self, created_after: str | None = None) -> list[dict]:
         """Get malware detection events.
 
@@ -583,6 +594,7 @@ def enrich_backup_objects(
     objects: list[dict],
     server_name: str,
     tasks: list[dict] | None = None,
+    all_restore_points: list[dict] | None = None,
 ) -> list[dict]:
     """Enrich backup objects with restore point info, task data, and calculated fields.
 
@@ -591,6 +603,15 @@ def enrich_backup_objects(
     - backupAgeSeconds: Time since last backup (from restore points)
     - latestRestorePoint: Full restore point data
     - taskData: Task details for VM backups (duration, speed, bottleneck)
+
+    Args:
+        api: VeeamRestAPI instance
+        objects: List of backup objects to enrich
+        server_name: Name of the Veeam server
+        tasks: Optional list of task sessions for task data enrichment
+        all_restore_points: Optional pre-fetched restore points from get_all_restore_points().
+                           If provided, uses bulk matching instead of per-object API calls.
+                           This reduces ~500 API calls to ~1-5 for large environments.
     """
     now = datetime.now(timezone.utc)
 
@@ -605,12 +626,24 @@ def enrich_backup_objects(
                 if not existing or task.get("endTime", "") > existing.get("endTime", ""):
                     task_by_name[task_name] = task
 
+    # Build restore point lookup by object name if bulk data provided
+    # Key: object name (lowercase), Value: latest restore point
+    rp_by_name: dict[str, dict] = {}
+    if all_restore_points:
+        for rp in all_restore_points:
+            rp_name = rp.get("name", "").lower()
+            if rp_name:
+                existing = rp_by_name.get(rp_name)
+                # Keep the latest restore point by creation time
+                if not existing or rp.get("creationTime", "") > existing.get("creationTime", ""):
+                    rp_by_name[rp_name] = rp
+
     for obj in objects:
         obj["backupServer"] = server_name
         object_id = obj.get("id")
+        obj_name = obj.get("name", "").lower()
 
         # Try to merge task data if available (VM backups only)
-        obj_name = obj.get("name", "").lower()
         if obj_name and obj_name in task_by_name:
             task = task_by_name[obj_name]
             obj["taskData"] = {
@@ -622,28 +655,33 @@ def enrich_backup_objects(
                 "endTime": task.get("endTime"),
             }
 
-        if not object_id:
-            continue
+        # Get restore point data - either from bulk lookup or per-object API call
+        latest: dict | None = None
 
-        try:
-            # Get restore points for this object
-            restore_points = api.get_object_restore_points(object_id)
-            if restore_points:
-                # Find the latest restore point by creation time
-                latest = max(restore_points, key=lambda r: r.get("creationTime", ""))
-                obj["latestRestorePoint"] = latest
+        if all_restore_points is not None:
+            # Use pre-fetched bulk data (fast path)
+            if obj_name and obj_name in rp_by_name:
+                latest = rp_by_name[obj_name]
+        elif object_id:
+            # Fallback to per-object API call (slow path)
+            try:
+                restore_points = api.get_object_restore_points(object_id)
+                if restore_points:
+                    latest = max(restore_points, key=lambda r: r.get("creationTime", ""))
+            except VeeamAPIError:
+                pass
 
-                # Calculate backup age
-                creation_time = latest.get("creationTime")
-                if creation_time:
-                    try:
-                        dt = datetime.fromisoformat(creation_time.replace("Z", "+00:00"))
-                        obj["backupAgeSeconds"] = int((now - dt).total_seconds())
-                    except (ValueError, TypeError):
-                        obj["backupAgeSeconds"] = None
-        except VeeamAPIError:
-            # Skip enrichment if restore points can't be fetched
-            pass
+        if latest:
+            obj["latestRestorePoint"] = latest
+
+            # Calculate backup age
+            creation_time = latest.get("creationTime")
+            if creation_time:
+                try:
+                    dt = datetime.fromisoformat(creation_time.replace("Z", "+00:00"))
+                    obj["backupAgeSeconds"] = int((now - dt).total_seconds())
+                except (ValueError, TypeError):
+                    obj["backupAgeSeconds"] = None
 
     return objects
 
@@ -986,76 +1024,48 @@ def main() -> int:
             except VeeamAPIError as e:
                 sys.stderr.write(f"Warning: Failed to fetch jobs: {e}\n")
 
-        if "tasks" in args.sections:
-            try:
-                cache_interval = cache_config.tasks
-                cached = load_cached_section(hostname_for_cache, "tasks", cache_interval) if cache_interval else None
-                if cached:
-                    tasks, timestamp = cached
-                    output_section("tasks", tasks, redactor, timestamp, cache_interval)
-                else:
-                    # Build job type lookup: sessionId -> jobType
-                    # This allows filtering out agent backup tasks in discovery
-                    job_type_lookup: dict[str, str] = {}
-                    try:
-                        sessions = api.get_sessions(created_after)
-                        jobs = api.get_job_states()
-                        # Build jobId -> jobType map
-                        job_types = {job.get("id"): job.get("type") for job in jobs}
-                        # Build sessionId -> jobType map
-                        for session in sessions:
-                            session_id = session.get("id")
-                            job_id = session.get("jobId")
-                            if session_id and job_id and job_id in job_types:
-                                job_type_lookup[session_id] = job_types[job_id]
-                    except VeeamAPIError:
-                        pass  # Continue without job type info
-
-                    tasks = api.get_task_sessions(created_after)
-                    tasks = enrich_task_data(tasks, server_name, job_type_lookup)
-                    timestamp = store_cached_section(hostname_for_cache, "tasks", tasks) if cache_interval else None
-                    output_section("tasks", tasks, redactor, timestamp, cache_interval)
-            except VeeamAPIError as e:
-                sys.stderr.write(f"Warning: Failed to fetch tasks: {e}\n")
-
-        # Backup objects output based on --backup-mode
-        if args.backup_mode:
+        # Fetch and enrich backup objects once if needed by backup_mode or malware_mode
+        # This avoids duplicate API calls for get_object_restore_points() (500+ calls per run)
+        enriched_backup_objects: list[dict] | None = None
+        if args.backup_mode or args.malware_mode:
             try:
                 backup_objects = api.get_backup_objects_with_job_info()
 
+                # Fetch ALL restore points in bulk (1-5 calls instead of 500+)
+                # This is the major performance optimization for large environments
+                all_restore_points: list[dict] | None = None
+                try:
+                    all_restore_points = api.get_all_restore_points()
+                    if args.debug:
+                        sys.stderr.write(f"Fetched {len(all_restore_points)} restore points in bulk\n")
+                except VeeamAPIError as e:
+                    # Fall back to per-object calls if bulk fetch fails
+                    sys.stderr.write(f"Warning: Bulk restore points fetch failed, using per-object calls: {e}\n")
+
                 # Fetch tasks for enrichment (only available for VM backups)
                 tasks = None
-                try:
-                    tasks = api.get_task_sessions(created_after)
-                except VeeamAPIError:
-                    pass  # Tasks not available, continue without
+                if args.backup_mode:  # Only needed for backup services
+                    try:
+                        tasks = api.get_task_sessions(created_after)
+                    except VeeamAPIError:
+                        pass  # Tasks not available, continue without
 
-                backup_objects = enrich_backup_objects(api, backup_objects, server_name, tasks)
-
-                if args.backup_mode == "piggyback-vms":
-                    # Piggyback to monitored VMs
-                    output_piggyback_backup_objects(backup_objects, redactor)
-                elif args.backup_mode == "backup-server":
-                    # Direct services on Veeam server
-                    output_backup_objects_section(backup_objects, redactor)
+                enriched_backup_objects = enrich_backup_objects(
+                    api, backup_objects, server_name, tasks, all_restore_points
+                )
             except VeeamAPIError as e:
                 if args.debug:
                     raise
                 sys.stderr.write(f"Failed to fetch backup objects: {e}\n")
 
-        if "sessions" in args.sections:
-            try:
-                cache_interval = cache_config.sessions
-                cached = load_cached_section(hostname_for_cache, "sessions", cache_interval) if cache_interval else None
-                if cached:
-                    sessions, timestamp = cached
-                    output_section("sessions", sessions, redactor, timestamp, cache_interval)
-                else:
-                    sessions = api.get_sessions(created_after)
-                    timestamp = store_cached_section(hostname_for_cache, "sessions", sessions) if cache_interval else None
-                    output_section("sessions", sessions, redactor, timestamp, cache_interval)
-            except VeeamAPIError as e:
-                sys.stderr.write(f"Warning: Failed to fetch sessions: {e}\n")
+        # Backup objects output based on --backup-mode
+        if args.backup_mode and enriched_backup_objects is not None:
+            if args.backup_mode == "piggyback-vms":
+                # Piggyback to monitored VMs
+                output_piggyback_backup_objects(enriched_backup_objects, redactor)
+            elif args.backup_mode == "backup-server":
+                # Direct services on Veeam server
+                output_backup_objects_section(enriched_backup_objects, redactor)
 
         if "repositories" in args.sections:
             try:
@@ -1158,20 +1168,20 @@ def main() -> int:
         # Malware events output based on --malware-mode (combined with backup status)
         if args.malware_mode:
             try:
-                malware_events = api.get_malware_events(created_after)
+                cache_interval = cache_config.malware_combined
+                cached = load_cached_section(hostname_for_cache, "malware_combined", cache_interval) if cache_interval else None
 
-                # Fetch backup objects to enrich malware data with malwareStatus
-                backup_objects = []
-                try:
-                    backup_objects = api.get_backup_objects_with_job_info()
-                    backup_objects = enrich_backup_objects(api, backup_objects, server_name)
-                except VeeamAPIError:
-                    pass  # Continue without backup data
+                if cached:
+                    malware_combined, _ = cached
+                else:
+                    malware_events = api.get_malware_events(created_after)
 
-                # Combine malware events with backup status
-                malware_combined = enrich_malware_events_with_backup_status(
-                    malware_events, backup_objects
-                )
+                    # Reuse enriched backup objects (already fetched above if backup_mode or malware_mode)
+                    # This avoids duplicate API calls for restore points
+                    malware_combined = enrich_malware_events_with_backup_status(
+                        malware_events, enriched_backup_objects or []
+                    )
+                    store_cached_section(hostname_for_cache, "malware_combined", malware_combined) if cache_interval else None
 
                 if args.malware_mode == "piggyback-hosts":
                     # Piggyback to affected hosts

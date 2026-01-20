@@ -98,14 +98,6 @@ def _parameter_form() -> Dictionary:
                             title=Title("Backup Jobs"),
                         ),
                         MultipleChoiceElement(
-                            name="tasks",
-                            title=Title("Task Sessions (per-VM details) - Legacy, use Piggyback instead"),
-                        ),
-                        MultipleChoiceElement(
-                            name="sessions",
-                            title=Title("Sessions"),
-                        ),
-                        MultipleChoiceElement(
                             name="repositories",
                             title=Title("Repositories"),
                         ),
@@ -227,24 +219,6 @@ def _parameter_form() -> Dictionary:
                             required=False,
                             parameter_form=TimeSpan(
                                 title=Title("Jobs"),
-                                help_text=Help("Default: 5 minutes"),
-                                displayed_magnitudes=[TimeMagnitude.MINUTE, TimeMagnitude.HOUR],
-                                prefill=DefaultValue(300),
-                            ),
-                        ),
-                        "tasks": DictElement(
-                            required=False,
-                            parameter_form=TimeSpan(
-                                title=Title("Tasks"),
-                                help_text=Help("Default: 1 minute"),
-                                displayed_magnitudes=[TimeMagnitude.MINUTE, TimeMagnitude.HOUR],
-                                prefill=DefaultValue(60),
-                            ),
-                        ),
-                        "sessions": DictElement(
-                            required=False,
-                            parameter_form=TimeSpan(
-                                title=Title("Sessions"),
                                 help_text=Help("Default: 5 minutes"),
                                 displayed_magnitudes=[TimeMagnitude.MINUTE, TimeMagnitude.HOUR],
                                 prefill=DefaultValue(300),

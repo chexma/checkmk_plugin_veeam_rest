@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.35] - 2026-01-20
+
+### Changed
+- **Major Performance Optimization**: Bulk restore point fetching
+  - New `get_all_restore_points()` API method fetches ALL restore points in 1-5 calls
+  - Replaces ~500 individual `get_object_restore_points()` calls per VM
+  - Matching by object name in Python instead of per-object API calls
+  - **Result: ~495 fewer API calls, ~50 seconds faster for 500 VMs**
+- **Performance Optimization**: Deduplicated backup object enrichment
+  - `enrich_backup_objects()` now called only once when both backup_mode and malware_mode are enabled
+  - Prevents duplicate restore point fetching when both modes active
+
+## [0.0.34] - 2026-01-20
+
+### Added
+- **Caching for Malware Services**: Added caching for `--malware-mode` (Attach to Hosts/Backup Server)
+  - Combined malware data now cached for 5 minutes (default)
+  - Reduces API load when malware services are enabled
+  - New cache key `malware_combined` for enriched malware data
+
 ## [0.0.33] - 2026-01-20
 
 ### Added
@@ -10,6 +30,12 @@ All notable changes to this project will be documented in this file.
   - Password store usage recommendation for secure credential storage
   - Troubleshooting section for common issues
   - Upgrade and uninstall instructions
+
+### Removed
+- **Removed unused sections**: `tasks` and `sessions` sections removed from GUI
+  - These sections output data but no check plugin consumed them
+  - Task data is still fetched internally for backup object enrichment
+  - Simplifies configuration by removing non-functional options
 
 ## [0.0.32] - 2026-01-20
 

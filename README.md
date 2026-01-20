@@ -42,8 +42,6 @@ See [Installation Guide](installation.md) for detailed setup instructions includ
 | jobs | Yes | Backup job states |
 | repositories | Yes | Repository capacity |
 | proxies | Yes | Proxy status |
-| tasks | No | Legacy task sessions (use piggyback instead) |
-| sessions | No | Session history |
 | managed_servers | No | Managed infrastructure |
 | license | No | License information |
 | server | No | Backup server info |
@@ -68,8 +66,6 @@ The agent supports per-section caching to reduce API load:
 | Section | Default Cache |
 |---------|---------------|
 | Jobs | 5 min |
-| Tasks | 1 min |
-| Sessions | 5 min |
 | Repositories | 30 min |
 | Proxies | 1 hour |
 | Managed Servers | 1 hour |

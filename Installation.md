@@ -18,7 +18,7 @@ Download the latest MKP file from the [GitHub Releases](https://github.com/chexm
 Or copy the MKP file directly to your Checkmk server:
 
 ```bash
-scp veeam_rest-0.0.33.mkp user@checkmk-server:/tmp/
+scp veeam_rest-0.0.35.mkp user@checkmk-server:/tmp/
 ```
 
 ## Step 2: Install the Plugin
@@ -33,8 +33,8 @@ sudo su - <sitename>
 Install and enable the plugin:
 
 ```bash
-mkp add /tmp/veeam_rest-0.0.33.mkp
-mkp enable veeam_rest 0.0.33
+mkp add /tmp/veeam_rest-0.0.35.mkp
+mkp enable veeam_rest 0.0.35
 ```
 
 Restart the Apache service to load the new rulesets:
@@ -47,7 +47,7 @@ Verify the installation:
 
 ```bash
 mkp list
-# Should show: veeam_rest 0.0.33
+# Should show: veeam_rest 0.0.35
 ```
 
 ## Step 3: Configure Veeam REST API Access
@@ -205,7 +205,7 @@ To upgrade to a new version:
 mkp add veeam_rest-X.Y.Z.mkp
 
 # Disable old version, enable new
-mkp disable veeam_rest 0.0.33
+mkp disable veeam_rest 0.0.35
 mkp enable veeam_rest X.Y.Z
 
 # Restart services
@@ -216,8 +216,8 @@ cmk -R
 ## Uninstalling
 
 ```bash
-mkp disable veeam_rest 0.0.33
-mkp remove veeam_rest 0.0.33
+mkp disable veeam_rest 0.0.35
+mkp remove veeam_rest 0.0.35
 omd restart apache
 ```
 
