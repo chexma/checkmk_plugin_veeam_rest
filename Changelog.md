@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.29] - 2026-01-20
+
+### Added
+- **Malware Detection Events Section**: New `malware_events` section to monitor Veeam's malware detection events
+  - Shows which machines have been flagged as suspicious/infected
+  - Tracks confirmed false positives (marked as clean)
+  - New check plugin `veeam_rest_malware_events` with service "Veeam Malware <machine>"
+  - Displays event details: type, severity, source, detection time
+  - Metrics: total events, active events, false positives
+- New API endpoint: `/api/v1/malwareDetection/events`
+
+## [0.0.28] - 2026-01-20
+
+### Added
+- **Configurable Malware Status**: Malware scan results can now be mapped to custom monitoring states via rulesets
+  - New ruleset "Veeam VM Backup (Piggyback)" for piggyback services
+  - New ruleset "Veeam Backup Objects (Server)" for server services
+- New default behavior for malware status:
+  - `Suspicious` → WARNING (previously OK)
+  - `NotScanned` → WARNING (previously no output)
+  - `Infected` → CRITICAL (unchanged)
+  - `Clean` → OK (unchanged)
+
 ## [0.0.27] - 2026-01-20
 
 ### Added

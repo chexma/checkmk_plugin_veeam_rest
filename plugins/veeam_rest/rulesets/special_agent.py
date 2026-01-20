@@ -131,6 +131,10 @@ def _parameter_form() -> Dictionary:
                             name="wan_accelerators",
                             title=Title("WAN Accelerators"),
                         ),
+                        MultipleChoiceElement(
+                            name="malware_events",
+                            title=Title("Malware Detection Events"),
+                        ),
                     ],
                     prefill=DefaultValue(["jobs", "repositories", "proxies"]),
                 ),
@@ -160,6 +164,19 @@ def _parameter_form() -> Dictionary:
                         "service on the Veeam server itself. Use this when you want to monitor "
                         "backup status without requiring piggyback to target hosts. "
                         "Can be used together with piggyback option."
+                    ),
+                    prefill=DefaultValue(False),
+                ),
+            ),
+            "piggyback_malware": DictElement(
+                required=False,
+                parameter_form=BooleanChoice(
+                    title=Title("Create Piggyback Data for Malware Events"),
+                    label=Title("Attach malware events to affected hosts"),
+                    help_text=Help(
+                        "When enabled, malware events are attached as piggyback data to the "
+                        "affected hosts. The machine name in Veeam must match the Checkmk hostname. "
+                        "Can be used together with 'malware_events' section for server services."
                     ),
                     prefill=DefaultValue(False),
                 ),
@@ -288,6 +305,15 @@ def _parameter_form() -> Dictionary:
                                 help_text=Help("Default: 1 hour"),
                                 displayed_magnitudes=[TimeMagnitude.MINUTE, TimeMagnitude.HOUR],
                                 prefill=DefaultValue(3600),
+                            ),
+                        ),
+                        "malware_events": DictElement(
+                            required=False,
+                            parameter_form=TimeSpan(
+                                title=Title("Malware Events"),
+                                help_text=Help("Default: 5 minutes"),
+                                displayed_magnitudes=[TimeMagnitude.MINUTE, TimeMagnitude.HOUR],
+                                prefill=DefaultValue(300),
                             ),
                         ),
                     },

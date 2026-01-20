@@ -42,6 +42,7 @@ class CachePerSection:
     server: int | None = 86400          # 24 hours
     scaleout_repositories: int | None = 1800  # 30 minutes
     wan_accelerators: int | None = 3600  # 1 hour
+    malware_events: int | None = 300    # 5 minutes
 
 
 def get_cache_dir() -> Path:
@@ -415,6 +416,17 @@ class VeeamRestAPI:
         """Get restore points for a specific backup object."""
         return self._get_paginated(f"/api/v1/backupObjects/{object_id}/restorePoints")
 
+    def get_malware_events(self, created_after: str | None = None) -> list[dict]:
+        """Get malware detection events.
+
+        Returns events with details about suspicious activity detection,
+        including events marked as false positive (confirmed clean).
+        """
+        params = {}
+        if created_after:
+            params["createdAfterTimeUtcFilter"] = created_after
+        return self._get_paginated("/api/v1/malwareDetection/events", params)
+
 
 # =============================================================================
 # OUTPUT FUNCTIONS
@@ -624,6 +636,36 @@ def output_backup_objects_section(objects: list[dict], redactor: VeeamRedactor |
     print(json.dumps(objects))
 
 
+def output_piggyback_malware_events(events: list[dict], redactor: VeeamRedactor | None = None) -> None:
+    """Output malware events as piggyback sections per affected machine.
+
+    Each machine with malware events gets its own piggyback section,
+    allowing the events to be attached to the affected hosts.
+    """
+    # Group events by machine name
+    events_by_machine: dict[str, list[dict]] = {}
+    for event in events:
+        machine = event.get("machine", {})
+        machine_name = machine.get("name")
+        if machine_name:
+            if machine_name not in events_by_machine:
+                events_by_machine[machine_name] = []
+            events_by_machine[machine_name].append(event)
+
+    # Output piggyback section per machine
+    for machine_name, machine_events in events_by_machine.items():
+        piggyback_hostname = machine_name.lower().replace(" ", "_")
+
+        if redactor:
+            machine_events = [redactor.redact_dict(e) for e in machine_events]
+
+        print(f"<<<<{piggyback_hostname}>>>>")
+        print("<<<veeam_rest_malware_events:sep(0)>>>")
+        # Output as dict with machine name as key (matching existing parser)
+        print(json.dumps({machine_name: machine_events}))
+        print("<<<<>>>>")
+
+
 # =============================================================================
 # MAIN
 # =============================================================================
@@ -681,6 +723,11 @@ def parse_arguments() -> argparse.Namespace:
         "--backup-objects",
         action="store_true",
         help="Output backup objects as section on Veeam server (creates per-object services)"
+    )
+    parser.add_argument(
+        "--piggyback-malware",
+        action="store_true",
+        help="Create piggyback data for malware events (attached to affected hosts)"
     )
     parser.add_argument(
         "--session-age",
@@ -968,6 +1015,27 @@ def main() -> int:
                 wan_accelerators = api.get_wan_accelerators()
                 timestamp = store_cached_section(hostname_for_cache, "wan_accelerators", wan_accelerators) if cache_interval else None
                 output_section("wan_accelerators", wan_accelerators, redactor, timestamp, cache_interval)
+
+        if "malware_events" in args.sections:
+            cache_interval = cache_config.malware_events
+            cached = load_cached_section(hostname_for_cache, "malware_events", cache_interval) if cache_interval else None
+            if cached:
+                malware_events, timestamp = cached
+                output_section("malware_events", malware_events, redactor, timestamp, cache_interval)
+            else:
+                malware_events = api.get_malware_events(created_after)
+                timestamp = store_cached_section(hostname_for_cache, "malware_events", malware_events) if cache_interval else None
+                output_section("malware_events", malware_events, redactor, timestamp, cache_interval)
+
+        # Piggyback output for malware events
+        if args.piggyback_malware:
+            try:
+                malware_events = api.get_malware_events(created_after)
+                output_piggyback_malware_events(malware_events, redactor)
+            except VeeamAPIError as e:
+                if args.debug:
+                    raise
+                sys.stderr.write(f"Failed to fetch malware events for piggyback: {e}\n")
 
     except VeeamAPIError as e:
         # Authentication or critical API error

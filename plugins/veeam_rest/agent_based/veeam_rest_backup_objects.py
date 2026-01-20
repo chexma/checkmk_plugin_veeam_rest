@@ -199,13 +199,31 @@ def check_veeam_rest_backup_objects(
                 yield Result(state=State.OK, summary=f"Size: {render.bytes(original_size)}")
                 yield Metric("veeam_rest_backup_size_processed", original_size)
 
-        # Malware status
+        # Malware status - configurable via parameters
         malware_status = latest_rp.get("malwareStatus")
-        if malware_status and malware_status != "NotScanned":
-            if malware_status == "Clean":
-                yield Result(state=State.OK, notice="Malware scan: Clean")
-            elif malware_status == "Infected":
-                yield Result(state=State.CRIT, summary="Malware detected!")
+        if malware_status:
+            malware_states = params.get("malware_status_states", {})
+
+            # Defaults: Suspicious and NotScanned generate warnings
+            state_mapping = {
+                "Clean": State.OK,
+                "Infected": State.CRIT,
+                "Suspicious": State.WARN,
+                "NotScanned": State.WARN,
+            }
+
+            # Override defaults with configured parameters
+            state_str_map = {"ok": State.OK, "warn": State.WARN, "crit": State.CRIT}
+            for status, state_str in malware_states.items():
+                if state_str in state_str_map:
+                    state_mapping[status] = state_str_map[state_str]
+
+            malware_result_state = state_mapping.get(malware_status, State.OK)
+
+            if malware_result_state == State.CRIT:
+                yield Result(state=malware_result_state, summary=f"Malware: {malware_status}")
+            elif malware_result_state == State.WARN:
+                yield Result(state=malware_result_state, summary=f"Malware scan: {malware_status}")
             else:
                 yield Result(state=State.OK, notice=f"Malware scan: {malware_status}")
 
@@ -240,6 +258,13 @@ check_plugin_veeam_rest_backup_objects = CheckPlugin(
     service_name="Veeam Backup %s",
     discovery_function=discover_veeam_rest_backup_objects,
     check_function=check_veeam_rest_backup_objects,
-    check_default_parameters={},
+    check_default_parameters={
+        "malware_status_states": {
+            "Clean": "ok",
+            "Infected": "crit",
+            "Suspicious": "warn",
+            "NotScanned": "warn",
+        }
+    },
     check_ruleset_name="veeam_rest_backup_objects",
 )

@@ -496,3 +496,153 @@ rule_spec_veeam_rest_wan_accelerators = CheckParameters(
     parameter_form=_veeam_rest_wan_accelerators_form,
     condition=HostAndItemCondition(item_title=Title("Accelerator name")),
 )
+
+
+# =============================================================================
+# SHARED ELEMENTS FOR VM/BACKUP OBJECT CHECKS
+# =============================================================================
+
+def _malware_status_elements() -> dict:
+    """Shared malware status configuration elements for VM backup checks."""
+    return {
+        "malware_status_states": DictElement(
+            required=False,
+            parameter_form=Dictionary(
+                title=Title("Malware Status State Mapping"),
+                help_text=Help(
+                    "Configure the monitoring state for each malware scan result. "
+                    "By default, 'Suspicious' and 'NotScanned' generate warnings."
+                ),
+                elements={
+                    "Clean": DictElement(
+                        required=False,
+                        parameter_form=SingleChoice(
+                            title=Title("Clean"),
+                            elements=[
+                                SingleChoiceElement(name="ok", title=Title("OK")),
+                                SingleChoiceElement(name="warn", title=Title("WARNING")),
+                                SingleChoiceElement(name="crit", title=Title("CRITICAL")),
+                            ],
+                            prefill=DefaultValue("ok"),
+                        ),
+                    ),
+                    "Infected": DictElement(
+                        required=False,
+                        parameter_form=SingleChoice(
+                            title=Title("Infected"),
+                            elements=[
+                                SingleChoiceElement(name="ok", title=Title("OK")),
+                                SingleChoiceElement(name="warn", title=Title("WARNING")),
+                                SingleChoiceElement(name="crit", title=Title("CRITICAL")),
+                            ],
+                            prefill=DefaultValue("crit"),
+                        ),
+                    ),
+                    "Suspicious": DictElement(
+                        required=False,
+                        parameter_form=SingleChoice(
+                            title=Title("Suspicious"),
+                            elements=[
+                                SingleChoiceElement(name="ok", title=Title("OK")),
+                                SingleChoiceElement(name="warn", title=Title("WARNING")),
+                                SingleChoiceElement(name="crit", title=Title("CRITICAL")),
+                            ],
+                            prefill=DefaultValue("warn"),
+                        ),
+                    ),
+                    "NotScanned": DictElement(
+                        required=False,
+                        parameter_form=SingleChoice(
+                            title=Title("Not Scanned"),
+                            elements=[
+                                SingleChoiceElement(name="ok", title=Title("OK")),
+                                SingleChoiceElement(name="warn", title=Title("WARNING")),
+                                SingleChoiceElement(name="crit", title=Title("CRITICAL")),
+                            ],
+                            prefill=DefaultValue("warn"),
+                        ),
+                    ),
+                },
+            ),
+        ),
+    }
+
+
+# =============================================================================
+# VEEAM VM BACKUP (PIGGYBACK)
+# =============================================================================
+
+def _veeam_rest_vm_backup_form() -> Dictionary:
+    return Dictionary(
+        title=Title("Veeam VM Backup Parameters"),
+        elements={
+            "backup_age_warn": DictElement(
+                required=False,
+                parameter_form=Integer(
+                    title=Title("Backup age warning"),
+                    help_text=Help("Alert with WARNING if backup is older than this (hours)."),
+                    unit_symbol="hours",
+                    prefill=DefaultValue(48),
+                ),
+            ),
+            "backup_age_crit": DictElement(
+                required=False,
+                parameter_form=Integer(
+                    title=Title("Backup age critical"),
+                    help_text=Help("Alert with CRITICAL if backup is older than this (hours)."),
+                    unit_symbol="hours",
+                    prefill=DefaultValue(72),
+                ),
+            ),
+            **_malware_status_elements(),
+        },
+    )
+
+
+rule_spec_veeam_rest_vm_backup = CheckParameters(
+    name="veeam_rest_vm_backup",
+    title=Title("Veeam VM Backup (Piggyback)"),
+    topic=Topic.APPLICATIONS,
+    parameter_form=_veeam_rest_vm_backup_form,
+    condition=HostCondition(),  # Singleton service on piggyback host
+)
+
+
+# =============================================================================
+# VEEAM BACKUP OBJECTS (SERVER SERVICES)
+# =============================================================================
+
+def _veeam_rest_backup_objects_form() -> Dictionary:
+    return Dictionary(
+        title=Title("Veeam Backup Object Parameters"),
+        elements={
+            "backup_age_warn": DictElement(
+                required=False,
+                parameter_form=Integer(
+                    title=Title("Backup age warning"),
+                    help_text=Help("Alert with WARNING if backup is older than this (hours)."),
+                    unit_symbol="hours",
+                    prefill=DefaultValue(48),
+                ),
+            ),
+            "backup_age_crit": DictElement(
+                required=False,
+                parameter_form=Integer(
+                    title=Title("Backup age critical"),
+                    help_text=Help("Alert with CRITICAL if backup is older than this (hours)."),
+                    unit_symbol="hours",
+                    prefill=DefaultValue(72),
+                ),
+            ),
+            **_malware_status_elements(),
+        },
+    )
+
+
+rule_spec_veeam_rest_backup_objects = CheckParameters(
+    name="veeam_rest_backup_objects",
+    title=Title("Veeam Backup Objects (Server)"),
+    topic=Topic.APPLICATIONS,
+    parameter_form=_veeam_rest_backup_objects_form,
+    condition=HostAndItemCondition(item_title=Title("Object name")),
+)

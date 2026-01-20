@@ -64,6 +64,10 @@ def _agent_arguments(
     if params.get("backup_objects", False):
         args.append("--backup-objects")
 
+    # Piggyback for malware events
+    if params.get("piggyback_malware", False):
+        args.append("--piggyback-malware")
+
     # Session age filter
     if "session_age" in params:
         args.extend(["--session-age", str(int(params["session_age"]))])
