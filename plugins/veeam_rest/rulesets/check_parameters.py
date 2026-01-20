@@ -569,12 +569,17 @@ def _malware_status_elements() -> dict:
 
 
 # =============================================================================
-# VEEAM VM BACKUP (PIGGYBACK)
+# VEEAM BACKUP (UNIFIED - Piggyback and Server Services)
 # =============================================================================
 
-def _veeam_rest_vm_backup_form() -> Dictionary:
+def _veeam_rest_backup_form() -> Dictionary:
     return Dictionary(
-        title=Title("Veeam VM Backup Parameters"),
+        title=Title("Veeam Backup Parameters"),
+        help_text=Help(
+            "Configure parameters for Veeam Backup services. "
+            "This ruleset applies to both piggyback services (on VMs) and "
+            "server-side services (on the Veeam backup server)."
+        ),
         elements={
             "backup_age_warn": DictElement(
                 required=False,
@@ -594,55 +599,40 @@ def _veeam_rest_vm_backup_form() -> Dictionary:
                     prefill=DefaultValue(72),
                 ),
             ),
-            **_malware_status_elements(),
         },
     )
 
 
-rule_spec_veeam_rest_vm_backup = CheckParameters(
-    name="veeam_rest_vm_backup",
-    title=Title("Veeam VM Backup (Piggyback)"),
+rule_spec_veeam_rest_backup = CheckParameters(
+    name="veeam_rest_backup",
+    title=Title("Veeam Backup (VM/Object)"),
     topic=Topic.APPLICATIONS,
-    parameter_form=_veeam_rest_vm_backup_form,
-    condition=HostCondition(),  # Singleton service on piggyback host
+    parameter_form=_veeam_rest_backup_form,
+    condition=HostAndItemCondition(item_title=Title("Object name")),
 )
 
 
 # =============================================================================
-# VEEAM BACKUP OBJECTS (SERVER SERVICES)
+# VEEAM MALWARE EVENTS
 # =============================================================================
 
-def _veeam_rest_backup_objects_form() -> Dictionary:
+def _veeam_rest_malware_events_form() -> Dictionary:
     return Dictionary(
-        title=Title("Veeam Backup Object Parameters"),
+        title=Title("Veeam Malware Events Parameters"),
+        help_text=Help(
+            "Configure parameters for Veeam Malware event monitoring. "
+            "This includes both malware detection events and the backup scan status."
+        ),
         elements={
-            "backup_age_warn": DictElement(
-                required=False,
-                parameter_form=Integer(
-                    title=Title("Backup age warning"),
-                    help_text=Help("Alert with WARNING if backup is older than this (hours)."),
-                    unit_symbol="hours",
-                    prefill=DefaultValue(48),
-                ),
-            ),
-            "backup_age_crit": DictElement(
-                required=False,
-                parameter_form=Integer(
-                    title=Title("Backup age critical"),
-                    help_text=Help("Alert with CRITICAL if backup is older than this (hours)."),
-                    unit_symbol="hours",
-                    prefill=DefaultValue(72),
-                ),
-            ),
             **_malware_status_elements(),
         },
     )
 
 
-rule_spec_veeam_rest_backup_objects = CheckParameters(
-    name="veeam_rest_backup_objects",
-    title=Title("Veeam Backup Objects (Server)"),
+rule_spec_veeam_rest_malware_events = CheckParameters(
+    name="veeam_rest_malware_events",
+    title=Title("Veeam Malware Events"),
     topic=Topic.APPLICATIONS,
-    parameter_form=_veeam_rest_backup_objects_form,
-    condition=HostAndItemCondition(item_title=Title("Object name")),
+    parameter_form=_veeam_rest_malware_events_form,
+    condition=HostAndItemCondition(item_title=Title("Machine name")),
 )

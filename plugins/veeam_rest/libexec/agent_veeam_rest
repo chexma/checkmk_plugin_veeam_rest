@@ -412,6 +412,54 @@ class VeeamRestAPI:
         """Get all backup objects (VMs, agents, etc.)."""
         return self._get_paginated("/api/v1/backupObjects")
 
+    def get_backups(self) -> list[dict]:
+        """Get all backups.
+
+        Returns backup metadata including jobId and name (job name).
+        """
+        return self._get_paginated("/api/v1/backups")
+
+    def get_backup_objects_for_backup(self, backup_id: str) -> list[dict]:
+        """Get backup objects for a specific backup."""
+        return self._get_paginated(f"/api/v1/backups/{backup_id}/objects")
+
+    def get_backup_objects_with_job_info(self) -> list[dict]:
+        """Get all backup objects enriched with job name.
+
+        This fetches all backups first, then collects objects from each backup
+        with the job name (backup.name) added to each object.
+
+        Objects with no restore points are filtered out (typically VMs that
+        were removed from the backup job but still have orphaned metadata).
+        """
+        all_objects = []
+        backups = self.get_backups()
+
+        for backup in backups:
+            backup_id = backup.get("id")
+            job_name = backup.get("name")  # name is the job name
+            job_type = backup.get("jobType")
+
+            if not backup_id:
+                continue
+
+            try:
+                objects = self.get_backup_objects_for_backup(backup_id)
+                for obj in objects:
+                    # Skip objects without restore points (removed from job)
+                    if obj.get("restorePointsCount", 0) == 0:
+                        continue
+
+                    obj["jobName"] = job_name
+                    if job_type:
+                        obj["jobType"] = job_type
+                    all_objects.append(obj)
+            except VeeamAPIError:
+                # Skip if we can't fetch objects for this backup
+                pass
+
+        return all_objects
+
     def get_object_restore_points(self, object_id: str) -> list[dict]:
         """Get restore points for a specific backup object."""
         return self._get_paginated(f"/api/v1/backupObjects/{object_id}/restorePoints")
@@ -636,33 +684,84 @@ def output_backup_objects_section(objects: list[dict], redactor: VeeamRedactor |
     print(json.dumps(objects))
 
 
-def output_piggyback_malware_events(events: list[dict], redactor: VeeamRedactor | None = None) -> None:
-    """Output malware events as piggyback sections per affected machine.
+def enrich_malware_events_with_backup_status(
+    malware_events: list[dict],
+    backup_objects: list[dict],
+) -> dict[str, dict]:
+    """Combine malware events with backup object malware status.
 
-    Each machine with malware events gets its own piggyback section,
-    allowing the events to be attached to the affected hosts.
+    Returns dict by hostname with:
+    - machineName: Original machine name
+    - events: list of malware events
+    - malwareStatus: from latest restore point (if available)
+    - restorePointsCount: number of restore points
+    - lastBackup: creation time of latest restore point
     """
-    # Group events by machine name
-    events_by_machine: dict[str, list[dict]] = {}
-    for event in events:
-        machine = event.get("machine", {})
-        machine_name = machine.get("name")
-        if machine_name:
-            if machine_name not in events_by_machine:
-                events_by_machine[machine_name] = []
-            events_by_machine[machine_name].append(event)
+    result: dict[str, dict] = {}
 
-    # Output piggyback section per machine
-    for machine_name, machine_events in events_by_machine.items():
+    # Build lookup by hostname from backup objects (lowercase for matching)
+    backup_by_name: dict[str, dict] = {}
+    for obj in backup_objects:
+        name = obj.get("name", "").lower()
+        if name:
+            backup_by_name[name] = obj
+
+    # Group events by machine name
+    for event in malware_events:
+        machine = event.get("machine", {})
+        machine_name = machine.get("name", "Unknown")
+        key = machine_name.lower()
+        if key not in result:
+            result[key] = {
+                "machineName": machine_name,
+                "events": [],
+                "malwareStatus": None,
+                "restorePointsCount": 0,
+                "lastBackup": None,
+            }
+        result[key]["events"].append(event)
+
+    # Enrich with backup object data
+    for key, data in result.items():
+        if key in backup_by_name:
+            obj = backup_by_name[key]
+            latest_rp = obj.get("latestRestorePoint", {})
+            data["malwareStatus"] = latest_rp.get("malwareStatus")
+            data["restorePointsCount"] = obj.get("restorePointsCount", 0)
+            data["lastBackup"] = latest_rp.get("creationTime")
+
+    return result
+
+
+def output_malware_combined(
+    malware_data: dict[str, dict],
+    redactor: VeeamRedactor | None = None,
+) -> None:
+    """Output combined malware data as server-side section.
+
+    Outputs all machines with malware events in a single section.
+    """
+    if redactor:
+        malware_data = {k: redactor.redact_dict(v) for k, v in malware_data.items()}
+    print("<<<veeam_rest_malware_events:sep(0)>>>")
+    print(json.dumps(malware_data))
+
+
+def output_piggyback_malware_combined(
+    malware_data: dict[str, dict],
+    redactor: VeeamRedactor | None = None,
+) -> None:
+    """Output combined malware data as piggyback sections per machine."""
+    for key, data in malware_data.items():
+        machine_name = data.get("machineName", key)
         piggyback_hostname = machine_name.lower().replace(" ", "_")
 
         if redactor:
-            machine_events = [redactor.redact_dict(e) for e in machine_events]
+            data = redactor.redact_dict(data)
 
         print(f"<<<<{piggyback_hostname}>>>>")
         print("<<<veeam_rest_malware_events:sep(0)>>>")
-        # Output as dict with machine name as key (matching existing parser)
-        print(json.dumps({machine_name: machine_events}))
+        print(json.dumps(data))
         print("<<<<>>>>")
 
 
@@ -712,22 +811,19 @@ def parse_arguments() -> argparse.Namespace:
         "--sections",
         nargs="*",
         default=["jobs", "repositories", "proxies"],
-        help="Sections to collect (tasks removed from default, use --piggyback-vms instead)"
+        help="Sections to collect (default: jobs, repositories, proxies)"
     )
     parser.add_argument(
-        "--piggyback-vms",
-        action="store_true",
-        help="Create piggyback data for VM/object backups (attached to monitored hosts)"
+        "--backup-mode",
+        choices=["piggyback-vms", "backup-server"],
+        default=None,
+        help="Backup service output mode: piggyback-vms (to VMs), backup-server (direct on server)"
     )
     parser.add_argument(
-        "--backup-objects",
-        action="store_true",
-        help="Output backup objects as section on Veeam server (creates per-object services)"
-    )
-    parser.add_argument(
-        "--piggyback-malware",
-        action="store_true",
-        help="Create piggyback data for malware events (attached to affected hosts)"
+        "--malware-mode",
+        choices=["piggyback-hosts", "backup-server"],
+        default=None,
+        help="Malware service output mode: piggyback-hosts (to affected hosts), backup-server (direct on server)"
     )
     parser.add_argument(
         "--session-age",
@@ -846,17 +942,20 @@ def main() -> int:
         # Get server info for enrichment
         server_name = args.hostname
         if "server" in args.sections:
-            cache_interval = cache_config.server
-            cached = load_cached_section(hostname_for_cache, "server", cache_interval) if cache_interval else None
-            if cached:
-                server_info, timestamp = cached
-                server_name = server_info.get("backupServerName", args.hostname)
-                output_section("server", server_info, redactor, timestamp, cache_interval)
-            else:
-                server_info = api.get_server_info()
-                server_name = server_info.get("backupServerName", args.hostname)
-                timestamp = store_cached_section(hostname_for_cache, "server", server_info) if cache_interval else None
-                output_section("server", server_info, redactor, timestamp, cache_interval)
+            try:
+                cache_interval = cache_config.server
+                cached = load_cached_section(hostname_for_cache, "server", cache_interval) if cache_interval else None
+                if cached:
+                    server_info, timestamp = cached
+                    server_name = server_info.get("backupServerName", args.hostname)
+                    output_section("server", server_info, redactor, timestamp, cache_interval)
+                else:
+                    server_info = api.get_server_info()
+                    server_name = server_info.get("backupServerName", args.hostname)
+                    timestamp = store_cached_section(hostname_for_cache, "server", server_info) if cache_interval else None
+                    output_section("server", server_info, redactor, timestamp, cache_interval)
+            except VeeamAPIError as e:
+                sys.stderr.write(f"Warning: Failed to fetch server info: {e}\n")
         else:
             # Try to get server name for enrichment even if not collecting server section
             try:
@@ -873,50 +972,56 @@ def main() -> int:
             ).isoformat()
 
         if "jobs" in args.sections:
-            cache_interval = cache_config.jobs
-            cached = load_cached_section(hostname_for_cache, "jobs", cache_interval) if cache_interval else None
-            if cached:
-                jobs, timestamp = cached
-                output_section("jobs", jobs, redactor, timestamp, cache_interval)
-            else:
-                jobs = api.get_job_states()
-                jobs = enrich_job_data(jobs, server_name)
-                timestamp = store_cached_section(hostname_for_cache, "jobs", jobs) if cache_interval else None
-                output_section("jobs", jobs, redactor, timestamp, cache_interval)
+            try:
+                cache_interval = cache_config.jobs
+                cached = load_cached_section(hostname_for_cache, "jobs", cache_interval) if cache_interval else None
+                if cached:
+                    jobs, timestamp = cached
+                    output_section("jobs", jobs, redactor, timestamp, cache_interval)
+                else:
+                    jobs = api.get_job_states()
+                    jobs = enrich_job_data(jobs, server_name)
+                    timestamp = store_cached_section(hostname_for_cache, "jobs", jobs) if cache_interval else None
+                    output_section("jobs", jobs, redactor, timestamp, cache_interval)
+            except VeeamAPIError as e:
+                sys.stderr.write(f"Warning: Failed to fetch jobs: {e}\n")
 
         if "tasks" in args.sections:
-            cache_interval = cache_config.tasks
-            cached = load_cached_section(hostname_for_cache, "tasks", cache_interval) if cache_interval else None
-            if cached:
-                tasks, timestamp = cached
-                output_section("tasks", tasks, redactor, timestamp, cache_interval)
-            else:
-                # Build job type lookup: sessionId -> jobType
-                # This allows filtering out agent backup tasks in discovery
-                job_type_lookup: dict[str, str] = {}
-                try:
-                    sessions = api.get_sessions(created_after)
-                    jobs = api.get_job_states()
-                    # Build jobId -> jobType map
-                    job_types = {job.get("id"): job.get("type") for job in jobs}
-                    # Build sessionId -> jobType map
-                    for session in sessions:
-                        session_id = session.get("id")
-                        job_id = session.get("jobId")
-                        if session_id and job_id and job_id in job_types:
-                            job_type_lookup[session_id] = job_types[job_id]
-                except VeeamAPIError:
-                    pass  # Continue without job type info
-
-                tasks = api.get_task_sessions(created_after)
-                tasks = enrich_task_data(tasks, server_name, job_type_lookup)
-                timestamp = store_cached_section(hostname_for_cache, "tasks", tasks) if cache_interval else None
-                output_section("tasks", tasks, redactor, timestamp, cache_interval)
-
-        # Backup objects output (can be piggyback, server section, or both)
-        if args.backup_objects or args.piggyback_vms:
             try:
-                backup_objects = api.get_backup_objects()
+                cache_interval = cache_config.tasks
+                cached = load_cached_section(hostname_for_cache, "tasks", cache_interval) if cache_interval else None
+                if cached:
+                    tasks, timestamp = cached
+                    output_section("tasks", tasks, redactor, timestamp, cache_interval)
+                else:
+                    # Build job type lookup: sessionId -> jobType
+                    # This allows filtering out agent backup tasks in discovery
+                    job_type_lookup: dict[str, str] = {}
+                    try:
+                        sessions = api.get_sessions(created_after)
+                        jobs = api.get_job_states()
+                        # Build jobId -> jobType map
+                        job_types = {job.get("id"): job.get("type") for job in jobs}
+                        # Build sessionId -> jobType map
+                        for session in sessions:
+                            session_id = session.get("id")
+                            job_id = session.get("jobId")
+                            if session_id and job_id and job_id in job_types:
+                                job_type_lookup[session_id] = job_types[job_id]
+                    except VeeamAPIError:
+                        pass  # Continue without job type info
+
+                    tasks = api.get_task_sessions(created_after)
+                    tasks = enrich_task_data(tasks, server_name, job_type_lookup)
+                    timestamp = store_cached_section(hostname_for_cache, "tasks", tasks) if cache_interval else None
+                    output_section("tasks", tasks, redactor, timestamp, cache_interval)
+            except VeeamAPIError as e:
+                sys.stderr.write(f"Warning: Failed to fetch tasks: {e}\n")
+
+        # Backup objects output based on --backup-mode
+        if args.backup_mode:
+            try:
+                backup_objects = api.get_backup_objects_with_job_info()
 
                 # Fetch tasks for enrichment (only available for VM backups)
                 tasks = None
@@ -927,115 +1032,157 @@ def main() -> int:
 
                 backup_objects = enrich_backup_objects(api, backup_objects, server_name, tasks)
 
-                # Option 1: Services on Veeam server
-                if args.backup_objects:
-                    output_backup_objects_section(backup_objects, redactor)
-
-                # Option 2: Piggyback to monitored hosts
-                if args.piggyback_vms:
+                if args.backup_mode == "piggyback-vms":
+                    # Piggyback to monitored VMs
                     output_piggyback_backup_objects(backup_objects, redactor)
+                elif args.backup_mode == "backup-server":
+                    # Direct services on Veeam server
+                    output_backup_objects_section(backup_objects, redactor)
             except VeeamAPIError as e:
                 if args.debug:
                     raise
                 sys.stderr.write(f"Failed to fetch backup objects: {e}\n")
 
         if "sessions" in args.sections:
-            cache_interval = cache_config.sessions
-            cached = load_cached_section(hostname_for_cache, "sessions", cache_interval) if cache_interval else None
-            if cached:
-                sessions, timestamp = cached
-                output_section("sessions", sessions, redactor, timestamp, cache_interval)
-            else:
-                sessions = api.get_sessions(created_after)
-                timestamp = store_cached_section(hostname_for_cache, "sessions", sessions) if cache_interval else None
-                output_section("sessions", sessions, redactor, timestamp, cache_interval)
+            try:
+                cache_interval = cache_config.sessions
+                cached = load_cached_section(hostname_for_cache, "sessions", cache_interval) if cache_interval else None
+                if cached:
+                    sessions, timestamp = cached
+                    output_section("sessions", sessions, redactor, timestamp, cache_interval)
+                else:
+                    sessions = api.get_sessions(created_after)
+                    timestamp = store_cached_section(hostname_for_cache, "sessions", sessions) if cache_interval else None
+                    output_section("sessions", sessions, redactor, timestamp, cache_interval)
+            except VeeamAPIError as e:
+                sys.stderr.write(f"Warning: Failed to fetch sessions: {e}\n")
 
         if "repositories" in args.sections:
-            cache_interval = cache_config.repositories
-            cached = load_cached_section(hostname_for_cache, "repositories", cache_interval) if cache_interval else None
-            if cached:
-                repos, timestamp = cached
-                output_section("repositories", repos, redactor, timestamp, cache_interval)
-            else:
-                repos = api.get_repository_states()
-                timestamp = store_cached_section(hostname_for_cache, "repositories", repos) if cache_interval else None
-                output_section("repositories", repos, redactor, timestamp, cache_interval)
+            try:
+                cache_interval = cache_config.repositories
+                cached = load_cached_section(hostname_for_cache, "repositories", cache_interval) if cache_interval else None
+                if cached:
+                    repos, timestamp = cached
+                    output_section("repositories", repos, redactor, timestamp, cache_interval)
+                else:
+                    repos = api.get_repository_states()
+                    timestamp = store_cached_section(hostname_for_cache, "repositories", repos) if cache_interval else None
+                    output_section("repositories", repos, redactor, timestamp, cache_interval)
+            except VeeamAPIError as e:
+                sys.stderr.write(f"Warning: Failed to fetch repositories: {e}\n")
 
         if "proxies" in args.sections:
-            cache_interval = cache_config.proxies
-            cached = load_cached_section(hostname_for_cache, "proxies", cache_interval) if cache_interval else None
-            if cached:
-                proxies, timestamp = cached
-                output_section("proxies", proxies, redactor, timestamp, cache_interval)
-            else:
-                proxies = api.get_proxy_states()
-                timestamp = store_cached_section(hostname_for_cache, "proxies", proxies) if cache_interval else None
-                output_section("proxies", proxies, redactor, timestamp, cache_interval)
+            try:
+                cache_interval = cache_config.proxies
+                cached = load_cached_section(hostname_for_cache, "proxies", cache_interval) if cache_interval else None
+                if cached:
+                    proxies, timestamp = cached
+                    output_section("proxies", proxies, redactor, timestamp, cache_interval)
+                else:
+                    proxies = api.get_proxy_states()
+                    timestamp = store_cached_section(hostname_for_cache, "proxies", proxies) if cache_interval else None
+                    output_section("proxies", proxies, redactor, timestamp, cache_interval)
+            except VeeamAPIError as e:
+                sys.stderr.write(f"Warning: Failed to fetch proxies: {e}\n")
 
         if "managed_servers" in args.sections:
-            cache_interval = cache_config.managed_servers
-            cached = load_cached_section(hostname_for_cache, "managed_servers", cache_interval) if cache_interval else None
-            if cached:
-                servers, timestamp = cached
-                output_section("managed_servers", servers, redactor, timestamp, cache_interval)
-            else:
-                servers = api.get_managed_servers()
-                timestamp = store_cached_section(hostname_for_cache, "managed_servers", servers) if cache_interval else None
-                output_section("managed_servers", servers, redactor, timestamp, cache_interval)
+            try:
+                cache_interval = cache_config.managed_servers
+                cached = load_cached_section(hostname_for_cache, "managed_servers", cache_interval) if cache_interval else None
+                if cached:
+                    servers, timestamp = cached
+                    output_section("managed_servers", servers, redactor, timestamp, cache_interval)
+                else:
+                    servers = api.get_managed_servers()
+                    timestamp = store_cached_section(hostname_for_cache, "managed_servers", servers) if cache_interval else None
+                    output_section("managed_servers", servers, redactor, timestamp, cache_interval)
+            except VeeamAPIError as e:
+                sys.stderr.write(f"Warning: Failed to fetch managed_servers: {e}\n")
 
         if "license" in args.sections:
-            cache_interval = cache_config.license
-            cached = load_cached_section(hostname_for_cache, "license", cache_interval) if cache_interval else None
-            if cached:
-                license_info, timestamp = cached
-                output_section("license", license_info, redactor, timestamp, cache_interval)
-            else:
-                license_info = api.get_license()
-                timestamp = store_cached_section(hostname_for_cache, "license", license_info) if cache_interval else None
-                output_section("license", license_info, redactor, timestamp, cache_interval)
+            try:
+                cache_interval = cache_config.license
+                cached = load_cached_section(hostname_for_cache, "license", cache_interval) if cache_interval else None
+                if cached:
+                    license_info, timestamp = cached
+                    output_section("license", license_info, redactor, timestamp, cache_interval)
+                else:
+                    license_info = api.get_license()
+                    timestamp = store_cached_section(hostname_for_cache, "license", license_info) if cache_interval else None
+                    output_section("license", license_info, redactor, timestamp, cache_interval)
+            except VeeamAPIError as e:
+                sys.stderr.write(f"Warning: Failed to fetch license: {e}\n")
 
         if "scaleout_repositories" in args.sections:
-            cache_interval = cache_config.scaleout_repositories
-            cached = load_cached_section(hostname_for_cache, "scaleout_repositories", cache_interval) if cache_interval else None
-            if cached:
-                scaleout_repos, timestamp = cached
-                output_section("scaleout_repositories", scaleout_repos, redactor, timestamp, cache_interval)
-            else:
-                scaleout_repos = api.get_scaleout_repositories()
-                timestamp = store_cached_section(hostname_for_cache, "scaleout_repositories", scaleout_repos) if cache_interval else None
-                output_section("scaleout_repositories", scaleout_repos, redactor, timestamp, cache_interval)
+            try:
+                cache_interval = cache_config.scaleout_repositories
+                cached = load_cached_section(hostname_for_cache, "scaleout_repositories", cache_interval) if cache_interval else None
+                if cached:
+                    scaleout_repos, timestamp = cached
+                    output_section("scaleout_repositories", scaleout_repos, redactor, timestamp, cache_interval)
+                else:
+                    scaleout_repos = api.get_scaleout_repositories()
+                    timestamp = store_cached_section(hostname_for_cache, "scaleout_repositories", scaleout_repos) if cache_interval else None
+                    output_section("scaleout_repositories", scaleout_repos, redactor, timestamp, cache_interval)
+            except VeeamAPIError as e:
+                sys.stderr.write(f"Warning: Failed to fetch scaleout_repositories: {e}\n")
 
         if "wan_accelerators" in args.sections:
-            cache_interval = cache_config.wan_accelerators
-            cached = load_cached_section(hostname_for_cache, "wan_accelerators", cache_interval) if cache_interval else None
-            if cached:
-                wan_accelerators, timestamp = cached
-                output_section("wan_accelerators", wan_accelerators, redactor, timestamp, cache_interval)
-            else:
-                wan_accelerators = api.get_wan_accelerators()
-                timestamp = store_cached_section(hostname_for_cache, "wan_accelerators", wan_accelerators) if cache_interval else None
-                output_section("wan_accelerators", wan_accelerators, redactor, timestamp, cache_interval)
+            try:
+                cache_interval = cache_config.wan_accelerators
+                cached = load_cached_section(hostname_for_cache, "wan_accelerators", cache_interval) if cache_interval else None
+                if cached:
+                    wan_accelerators, timestamp = cached
+                    output_section("wan_accelerators", wan_accelerators, redactor, timestamp, cache_interval)
+                else:
+                    wan_accelerators = api.get_wan_accelerators()
+                    timestamp = store_cached_section(hostname_for_cache, "wan_accelerators", wan_accelerators) if cache_interval else None
+                    output_section("wan_accelerators", wan_accelerators, redactor, timestamp, cache_interval)
+            except VeeamAPIError as e:
+                sys.stderr.write(f"Warning: Failed to fetch wan_accelerators: {e}\n")
 
         if "malware_events" in args.sections:
-            cache_interval = cache_config.malware_events
-            cached = load_cached_section(hostname_for_cache, "malware_events", cache_interval) if cache_interval else None
-            if cached:
-                malware_events, timestamp = cached
-                output_section("malware_events", malware_events, redactor, timestamp, cache_interval)
-            else:
-                malware_events = api.get_malware_events(created_after)
-                timestamp = store_cached_section(hostname_for_cache, "malware_events", malware_events) if cache_interval else None
-                output_section("malware_events", malware_events, redactor, timestamp, cache_interval)
+            try:
+                cache_interval = cache_config.malware_events
+                cached = load_cached_section(hostname_for_cache, "malware_events", cache_interval) if cache_interval else None
+                if cached:
+                    malware_events, timestamp = cached
+                    output_section("malware_events", malware_events, redactor, timestamp, cache_interval)
+                else:
+                    malware_events = api.get_malware_events(created_after)
+                    timestamp = store_cached_section(hostname_for_cache, "malware_events", malware_events) if cache_interval else None
+                    output_section("malware_events", malware_events, redactor, timestamp, cache_interval)
+            except VeeamAPIError as e:
+                sys.stderr.write(f"Warning: Failed to fetch malware_events: {e}\n")
 
-        # Piggyback output for malware events
-        if args.piggyback_malware:
+        # Malware events output based on --malware-mode (combined with backup status)
+        if args.malware_mode:
             try:
                 malware_events = api.get_malware_events(created_after)
-                output_piggyback_malware_events(malware_events, redactor)
+
+                # Fetch backup objects to enrich malware data with malwareStatus
+                backup_objects = []
+                try:
+                    backup_objects = api.get_backup_objects_with_job_info()
+                    backup_objects = enrich_backup_objects(api, backup_objects, server_name)
+                except VeeamAPIError:
+                    pass  # Continue without backup data
+
+                # Combine malware events with backup status
+                malware_combined = enrich_malware_events_with_backup_status(
+                    malware_events, backup_objects
+                )
+
+                if args.malware_mode == "piggyback-hosts":
+                    # Piggyback to affected hosts
+                    output_piggyback_malware_combined(malware_combined, redactor)
+                elif args.malware_mode == "backup-server":
+                    # Direct services on Veeam server
+                    output_malware_combined(malware_combined, redactor)
             except VeeamAPIError as e:
                 if args.debug:
                     raise
-                sys.stderr.write(f"Failed to fetch malware events for piggyback: {e}\n")
+                sys.stderr.write(f"Failed to fetch malware events: {e}\n")
 
     except VeeamAPIError as e:
         # Authentication or critical API error

@@ -2,6 +2,54 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.32] - 2026-01-20
+
+### Changed
+- **Dropdown Menus for Service Output**: Replaced checkbox options with dropdown menus for cleaner configuration
+  - New `backup_mode` dropdown with options: Disabled, Attach to Hosts, Attach to Backup Server
+  - New `malware_mode` dropdown with options: Disabled, Attach to Hosts, Attach to Backup Server
+  - Only one option can be selected at a time (mutually exclusive)
+  - Default is "Disabled" for both dropdowns
+- **New CLI Arguments**: Replaced `--piggyback-vms`, `--backup-objects`, `--piggyback-malware` with:
+  - `--backup-mode` (choices: piggyback-vms, backup-server)
+  - `--malware-mode` (choices: piggyback-hosts, backup-server)
+- **Consolidated Malware Monitoring**: Combined malware data sources for unified monitoring
+  - Malware events service now shows both: detection events AND backup scan status (malwareStatus)
+  - Removed malware status display from backup services (Veeam Backup <object>)
+  - Moved `malware_status_states` ruleset parameter from "Veeam Backup" to "Veeam Malware Events"
+  - Agent enriches malware events with restore point malware status for combined view
+
+## [0.0.31] - 2026-01-20
+
+### Added
+- **Job Name in Backup Services**: Backup object services now display which backup job they belong to
+  - Service summary shows "Job: <job_name>" for both server and piggyback services
+  - New API method fetches backup objects per backup to get job association
+  - Works for VM backups, agent backups, and all other backup types
+
+### Changed
+- **Unified Backup Services**: Piggyback and server-side backup services are now consistent
+  - Piggyback service renamed from "Veeam Backup" to "Veeam Backup <object_name>"
+  - Both service types now use the same ruleset "Veeam Backup (VM/Object)"
+  - Only one rule needed to configure both piggyback and server services
+  - Old rulesets "Veeam VM Backup (Piggyback)" and "Veeam Backup Objects (Server)" removed
+
+### Fixed
+- **Malware Events Piggyback**: Fixed output format for piggyback malware events
+  - Was outputting dict format instead of list format expected by parser
+  - Piggyback malware services now work correctly
+- **Orphaned Backup Objects**: VMs removed from backup jobs no longer create services
+  - Objects with `restorePointsCount == 0` are now filtered out
+  - Prevents "No restore points" WARN services for VMs no longer being backed up
+
+## [0.0.30] - 2026-01-20
+
+### Added
+- **Piggyback for Malware Events**: New `--piggyback-malware` option to attach malware events to affected hosts
+  - Services created on the affected hosts instead of the Veeam server
+  - New GUI option "Create Piggyback Data for Malware Events"
+  - Can be used together with `malware_events` section (both server and piggyback)
+
 ## [0.0.29] - 2026-01-20
 
 ### Added

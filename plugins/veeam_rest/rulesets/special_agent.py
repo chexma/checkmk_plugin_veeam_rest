@@ -15,6 +15,8 @@ from cmk.rulesets.v1.form_specs import (
     MultipleChoice,
     MultipleChoiceElement,
     Password,
+    SingleChoice,
+    SingleChoiceElement,
     String,
     TimeMagnitude,
     TimeSpan,
@@ -139,46 +141,50 @@ def _parameter_form() -> Dictionary:
                     prefill=DefaultValue(["jobs", "repositories", "proxies"]),
                 ),
             ),
-            # Piggyback options
-            "piggyback_vms": DictElement(
+            # Service output options
+            "backup_mode": DictElement(
                 required=False,
-                parameter_form=BooleanChoice(
-                    title=Title("Create Piggyback Data for VM Backups"),
-                    label=Title("Attach backup status to monitored VMs"),
+                parameter_form=SingleChoice(
+                    title=Title("Backup Services"),
                     help_text=Help(
-                        "When enabled, backup status is attached as piggyback data to the "
-                        "monitored VM hosts instead of creating services on the Veeam server. "
-                        "The VM hostname in Veeam must match the Checkmk hostname. "
-                        "Note: Only works for VM-based backups (vSphere, Hyper-V), not agent backups."
+                        "Configure how backup object services are created. "
+                        "Piggyback attaches services to target VMs/hosts, Server creates services "
+                        "directly on the Veeam server."
                     ),
-                    prefill=DefaultValue(False),
+                    elements=[
+                        SingleChoiceElement(name="disabled", title=Title("Disabled")),
+                        SingleChoiceElement(
+                            name="piggyback_vms",
+                            title=Title("Attach to Hosts"),
+                        ),
+                        SingleChoiceElement(
+                            name="backup_server",
+                            title=Title("Attach to Backup Server"),
+                        ),
+                    ],
+                    prefill=DefaultValue("disabled"),
                 ),
             ),
-            "backup_objects": DictElement(
+            "malware_mode": DictElement(
                 required=False,
-                parameter_form=BooleanChoice(
-                    title=Title("Create Backup Object Services on Server"),
-                    label=Title("Create per-object backup services on Veeam server"),
+                parameter_form=SingleChoice(
+                    title=Title("Malware Services"),
                     help_text=Help(
-                        "When enabled, each backup object (VM, agent backup) creates a separate "
-                        "service on the Veeam server itself. Use this when you want to monitor "
-                        "backup status without requiring piggyback to target hosts. "
-                        "Can be used together with piggyback option."
+                        "Configure how malware event services are created. "
+                        "Requires 'Malware Detection Events' in Sections to Collect."
                     ),
-                    prefill=DefaultValue(False),
-                ),
-            ),
-            "piggyback_malware": DictElement(
-                required=False,
-                parameter_form=BooleanChoice(
-                    title=Title("Create Piggyback Data for Malware Events"),
-                    label=Title("Attach malware events to affected hosts"),
-                    help_text=Help(
-                        "When enabled, malware events are attached as piggyback data to the "
-                        "affected hosts. The machine name in Veeam must match the Checkmk hostname. "
-                        "Can be used together with 'malware_events' section for server services."
-                    ),
-                    prefill=DefaultValue(False),
+                    elements=[
+                        SingleChoiceElement(name="disabled", title=Title("Disabled")),
+                        SingleChoiceElement(
+                            name="piggyback_hosts",
+                            title=Title("Attach to Hosts"),
+                        ),
+                        SingleChoiceElement(
+                            name="backup_server",
+                            title=Title("Attach to Backup Server"),
+                        ),
+                    ],
+                    prefill=DefaultValue("disabled"),
                 ),
             ),
             # Filtering options

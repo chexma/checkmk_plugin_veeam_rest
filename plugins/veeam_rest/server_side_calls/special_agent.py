@@ -56,17 +56,15 @@ def _agent_arguments(
     if sections:
         args.extend(["--sections"] + list(sections))
 
-    # Piggyback for VM backups
-    if params.get("piggyback_vms", False):
-        args.append("--piggyback-vms")
+    # Backup service output mode
+    backup_mode = params.get("backup_mode", "disabled")
+    if backup_mode != "disabled":
+        args.extend(["--backup-mode", backup_mode.replace("_", "-")])
 
-    # Backup objects as services on server
-    if params.get("backup_objects", False):
-        args.append("--backup-objects")
-
-    # Piggyback for malware events
-    if params.get("piggyback_malware", False):
-        args.append("--piggyback-malware")
+    # Malware service output mode
+    malware_mode = params.get("malware_mode", "disabled")
+    if malware_mode != "disabled":
+        args.extend(["--malware-mode", malware_mode.replace("_", "-")])
 
     # Session age filter
     if "session_age" in params:

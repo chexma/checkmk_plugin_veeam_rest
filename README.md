@@ -5,41 +5,113 @@ Checkmk 2.4 plugin for monitoring Veeam Backup & Replication (Version 13 and abo
 ## Features
 
 - **Jobs** - Backup/replication job status with duration & processed data display
-- **Tasks** - Per-VM/object backup details with performance metrics
+- **Backup Objects** - Per-VM/agent backup status with restore point info
 - **Repositories** - Capacity, usage levels, online status with perfometer
 - **Proxies** - Online/disabled/outdated status
 - **Managed Servers** - vCenter, ESXi, Hyper-V host availability
 - **License** - Status, expiration, instance usage with threshold display
 - **Scale-Out Repositories** - Extent health, tier status
 - **WAN Accelerators** - Cache size, configuration
+- **Malware Detection** - Events and backup scan status combined
+- **Piggyback Support** - Attach backup/malware services to monitored hosts
 - **Performance Graphs** - Job duration, data transfer, repository usage trends
 
 ## Installation
 
 ```bash
-mkp add veeam_rest-0.0.8.mkp
-mkp enable veeam_rest 0.0.8
+mkp add veeam_rest-0.0.32.mkp
+mkp enable veeam_rest 0.0.32
 omd restart apache
 ```
+
+See [Installation Guide](installation.md) for detailed setup instructions including Veeam user configuration and troubleshooting.
 
 ## Configuration
 
 1. **Setup > Agents > Other integrations > Veeam Backup & Replication (REST API)**
-2. Configure hostname, credentials (DOMAIN\user or user@domain), and sections to monitor
+2. Configure:
+   - Hostname/IP and credentials (DOMAIN\user or user@domain)
+   - Sections to collect (Jobs, Repositories, Proxies, etc.)
+   - Backup Services mode (Disabled, Attach to Hosts, Attach to Backup Server)
+   - Malware Services mode (Disabled, Attach to Hosts, Attach to Backup Server)
 3. Run service discovery on the Veeam host
+
+### Service Output Modes
+
+**Backup Services:**
+| Mode | Description |
+|------|-------------|
+| Disabled | No backup object services created |
+| Attach to Hosts | Piggyback services on monitored VMs/computers |
+| Attach to Backup Server | Services directly on Veeam server |
+
+**Malware Services:**
+| Mode | Description |
+|------|-------------|
+| Disabled | No malware services created |
+| Attach to Hosts | Piggyback services on affected machines |
+| Attach to Backup Server | Services directly on Veeam server |
 
 ## Services Created
 
 | Service | Description |
 |---------|-------------|
 | Veeam Job {type} - {name} | Backup job status, duration, processed data |
-| Veeam Backup {vm} | Per-VM backup age and size |
+| Veeam Backup {object} | Per-object backup status, job name, restore points |
+| Veeam Malware {machine} | Malware events + backup scan status combined |
 | Veeam Repository {name} | Repository capacity and usage |
 | Veeam Proxy {name} | Proxy online status |
 | Veeam Server {name} | Managed server availability |
 | Veeam License | License status, expiration with thresholds |
+| Veeam Backup Server | Backup server information |
 | Veeam SOBR {name} | Scale-out backup repository status |
 | Veeam WAN {name} | WAN accelerator status |
+
+## Sections
+
+| Section | Default | Description |
+|---------|---------|-------------|
+| jobs | Yes | Backup job states |
+| repositories | Yes | Repository capacity |
+| proxies | Yes | Proxy status |
+| tasks | No | Legacy task sessions (use piggyback instead) |
+| sessions | No | Session history |
+| managed_servers | No | Managed infrastructure |
+| license | No | License information |
+| server | No | Backup server info |
+| scaleout_repositories | No | Scale-out repositories |
+| wan_accelerators | No | WAN accelerators |
+| malware_events | No | Malware detection events |
+
+## Rulesets
+
+| Ruleset | Service | Parameters |
+|---------|---------|------------|
+| Veeam Backup Jobs | Veeam Job * | Job age, result/status state mapping |
+| Veeam Backup (VM/Object) | Veeam Backup * | Backup age thresholds |
+| Veeam Malware Events | Veeam Malware * | Malware status state mapping (Clean/Infected/Suspicious/NotScanned) |
+| Veeam Repositories | Veeam Repository * | Usage levels, free space thresholds |
+| Veeam License | Veeam License | Expiration thresholds, instance usage |
+
+## Caching
+
+The agent supports per-section caching to reduce API load:
+
+| Section | Default Cache |
+|---------|---------------|
+| Jobs | 5 min |
+| Tasks | 1 min |
+| Sessions | 5 min |
+| Repositories | 30 min |
+| Proxies | 1 hour |
+| Managed Servers | 1 hour |
+| License | 24 hours |
+| Server Info | 24 hours |
+| Scale-Out Repos | 30 min |
+| WAN Accelerators | 1 hour |
+| Malware Events | 5 min |
+
+Configure custom intervals via GUI or disable with `--no-cache`.
 
 ## Requirements
 
@@ -51,31 +123,16 @@ omd restart apache
 
 ### REST API Permissions (RBAC)
 
-The Veeam B&R REST API currently lacks granular role-based access control (RBAC). Only predefined roles are available, which are not well suited for monitoring use cases:
+The Veeam B&R REST API currently lacks granular role-based access control (RBAC). Only predefined roles are available:
 
-- **Veeam Backup Administrator** - Has full access but should not be used for security reasons
-- **Veeam Backup Viewer** - Read-only but lacks access to critical monitoring data (e.g., license information)
+- **Veeam Backup Administrator** - Full access but not recommended for security
+- **Veeam Backup Viewer** - Read-only but lacks access to some data (e.g., license)
 
-There is currently no way to create a dedicated monitoring user with minimal required permissions. As a workaround, you may need to use an Administrator account or accept limited monitoring capabilities with the Viewer role.
-
-Veeam has acknowledged this limitation and is working on a solution, but no timeframe has been provided. See: [Veeam Forums Discussion](https://forums.veeam.com/post561632.html#p561632)
-
-### Task Sessions for Agent Backups
-
-The Veeam REST API `/api/v1/taskSessions` endpoint does **not** return data for **Windows/Linux Agent Backups**. Task sessions are only populated for VM-based backups (vSphere, Hyper-V, etc.).
-
-**Impact:** "Veeam Backup {hostname}" services will show UNKNOWN for agent-based backups because no task session data is available.
-
-**Workaround:** Use the **Job services** ("Veeam Job Windows Agent - {jobname}") instead, which correctly show status, duration, and result for agent backup jobs. If you have discovered task services for agent backups, remove them with:
-
-```bash
-cmk -II hostname  # Re-discover services
-cmk -R
-```
+See: [Veeam Forums Discussion](https://forums.veeam.com/post561632.html#p561632)
 
 ## Contributors
 
-- [47k](https://github.com/47k) - Thanks for extensive testing of the plugin!
+- [47k](https://github.com/47k) - Thanks for extensive testing!
 
 ## License
 
