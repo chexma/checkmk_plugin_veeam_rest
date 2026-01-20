@@ -62,7 +62,7 @@ The REST API is enabled by default in Veeam B&R 13+. Verify it's running:
 
 ### Create a Monitoring User
 
-For security, create a dedicated, local user for monitoring.
+For security, create a dedicated, local Windows user for monitoring.
 
 ### Assign Veeam Permissions
 
