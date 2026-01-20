@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.33] - 2026-01-20
+
+### Added
+- **Installation Guide**: New `installation.md` with step-by-step setup instructions
+  - Prerequisites and Veeam REST API configuration
+  - Password store usage recommendation for secure credential storage
+  - Troubleshooting section for common issues
+  - Upgrade and uninstall instructions
+
 ## [0.0.32] - 2026-01-20
 
 ### Changed
