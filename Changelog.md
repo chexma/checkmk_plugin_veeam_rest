@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.27] - 2026-01-20
+
+### Added
+- **Backup Objects on Server**: New `--backup-objects` option to create per-object backup services directly on the Veeam server
+  - Alternative to piggyback mode for environments where piggyback is not suitable
+  - New check plugin `veeam_rest_backup_objects` with service name "Veeam Backup <object_name>"
+  - Both options can be used simultaneously (piggyback AND server services)
+- New GUI option "Create Backup Object Services on Server" in special agent configuration
+- Additional metrics for backup objects:
+  - `veeam_rest_backup_restore_points` - number of restore points
+  - `veeam_rest_backup_avg_speed` - average backup speed
+  - `veeam_rest_backup_total_size` - total size from progress
+  - `veeam_rest_backup_backup_size` - backup size from restore point
+  - `veeam_rest_backup_data_size` - data size from restore point
+
 ## [0.0.26] - 2026-01-20
 
 ### Fixed

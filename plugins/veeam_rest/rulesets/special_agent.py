@@ -150,6 +150,20 @@ def _parameter_form() -> Dictionary:
                     prefill=DefaultValue(False),
                 ),
             ),
+            "backup_objects": DictElement(
+                required=False,
+                parameter_form=BooleanChoice(
+                    title=Title("Create Backup Object Services on Server"),
+                    label=Title("Create per-object backup services on Veeam server"),
+                    help_text=Help(
+                        "When enabled, each backup object (VM, agent backup) creates a separate "
+                        "service on the Veeam server itself. Use this when you want to monitor "
+                        "backup status without requiring piggyback to target hosts. "
+                        "Can be used together with piggyback option."
+                    ),
+                    prefill=DefaultValue(False),
+                ),
+            ),
             # Filtering options
             "session_age": DictElement(
                 required=False,

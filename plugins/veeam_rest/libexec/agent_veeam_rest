@@ -613,6 +613,17 @@ def output_piggyback_backup_objects(objects: list[dict], redactor: VeeamRedactor
         print("<<<<>>>>")
 
 
+def output_backup_objects_section(objects: list[dict], redactor: VeeamRedactor | None = None) -> None:
+    """Output backup objects as regular section (services on Veeam server).
+
+    Each object in the list becomes a separate service on the Veeam backup server.
+    """
+    if redactor:
+        objects = [redactor.redact_dict(obj) for obj in objects]
+    print("<<<veeam_rest_backup_objects:sep(0)>>>")
+    print(json.dumps(objects))
+
+
 # =============================================================================
 # MAIN
 # =============================================================================
@@ -665,6 +676,11 @@ def parse_arguments() -> argparse.Namespace:
         "--piggyback-vms",
         action="store_true",
         help="Create piggyback data for VM/object backups (attached to monitored hosts)"
+    )
+    parser.add_argument(
+        "--backup-objects",
+        action="store_true",
+        help="Output backup objects as section on Veeam server (creates per-object services)"
     )
     parser.add_argument(
         "--session-age",
@@ -850,8 +866,8 @@ def main() -> int:
                 timestamp = store_cached_section(hostname_for_cache, "tasks", tasks) if cache_interval else None
                 output_section("tasks", tasks, redactor, timestamp, cache_interval)
 
-        # Piggyback output for backup objects (VMs and agent backups)
-        if args.piggyback_vms:
+        # Backup objects output (can be piggyback, server section, or both)
+        if args.backup_objects or args.piggyback_vms:
             try:
                 backup_objects = api.get_backup_objects()
 
@@ -863,11 +879,18 @@ def main() -> int:
                     pass  # Tasks not available, continue without
 
                 backup_objects = enrich_backup_objects(api, backup_objects, server_name, tasks)
-                output_piggyback_backup_objects(backup_objects, redactor)
+
+                # Option 1: Services on Veeam server
+                if args.backup_objects:
+                    output_backup_objects_section(backup_objects, redactor)
+
+                # Option 2: Piggyback to monitored hosts
+                if args.piggyback_vms:
+                    output_piggyback_backup_objects(backup_objects, redactor)
             except VeeamAPIError as e:
                 if args.debug:
                     raise
-                sys.stderr.write(f"Failed to fetch backup objects for piggyback: {e}\n")
+                sys.stderr.write(f"Failed to fetch backup objects: {e}\n")
 
         if "sessions" in args.sections:
             cache_interval = cache_config.sessions

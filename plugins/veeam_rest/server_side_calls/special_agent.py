@@ -60,6 +60,10 @@ def _agent_arguments(
     if params.get("piggyback_vms", False):
         args.append("--piggyback-vms")
 
+    # Backup objects as services on server
+    if params.get("backup_objects", False):
+        args.append("--backup-objects")
+
     # Session age filter
     if "session_age" in params:
         args.extend(["--session-age", str(int(params["session_age"]))])
