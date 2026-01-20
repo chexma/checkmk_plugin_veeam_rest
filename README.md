@@ -18,12 +18,6 @@ Checkmk 2.4 plugin for monitoring Veeam Backup & Replication (Version 13 and abo
 
 ## Installation
 
-```bash
-mkp add veeam_rest-0.0.32.mkp
-mkp enable veeam_rest 0.0.32
-omd restart apache
-```
-
 See [Installation Guide](installation.md) for detailed setup instructions including Veeam user configuration and troubleshooting.
 
 ## Configuration
