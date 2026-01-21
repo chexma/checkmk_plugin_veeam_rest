@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.41] - 2026-01-21
+
+### Added
+- **VM-specific Job Warnings/Errors**: Backup services now show issues from job session logs
+  - Fetches session logs for jobs with Warning or Failed result
+  - Only affected VMs show WARNING/CRITICAL (e.g., VSS writer failures)
+  - Warning jobs → WARN state, Failed jobs → CRIT state
+  - Full error message displayed in service details
+  - New API method: `get_session_logs()` using `/api/v1/sessions/{id}/logs`
+
 ## [0.0.40] - 2026-01-21
 
 ### Changed

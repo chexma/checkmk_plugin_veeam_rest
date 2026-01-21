@@ -120,6 +120,27 @@ def check_veeam_rest_vm_backup(
 
     yield Result(state=result_state, summary=summary)
 
+    # Check for warning/error info from session logs (e.g., VSS errors)
+    warning_info = section.get("warningInfo")
+    if warning_info:
+        warning_title = warning_info.get("warningTitle", "Unknown")
+        warning_msg = warning_info.get("warningMessage", "")
+        warning_job = warning_info.get("jobName", "")
+        severity = warning_info.get("severity", "Warning")
+
+        # Failed = CRIT, Warning = WARN
+        issue_state = State.CRIT if severity == "Failed" else State.WARN
+        issue_label = "Job error" if severity == "Failed" else "Job warning"
+
+        yield Result(
+            state=issue_state,
+            summary=f"{issue_label}: {warning_title}"
+        )
+        if warning_msg:
+            yield Result(state=State.OK, notice=f"{severity} details: {warning_msg}")
+        if warning_job:
+            yield Result(state=State.OK, notice=f"{severity} from job: {warning_job}")
+
     # Backup age from enrichment
     backup_age = section.get("backupAgeSeconds")
     if backup_age is not None:
