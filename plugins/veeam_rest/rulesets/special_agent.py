@@ -183,10 +183,10 @@ def _parameter_form() -> Dictionary:
             "session_age": DictElement(
                 required=False,
                 parameter_form=TimeSpan(
-                    title=Title("Maximum Session/Task Age"),
+                    title=Title("Maximum Task/Malware Event Age"),
                     help_text=Help(
-                        "Only fetch sessions and task details younger than this. "
-                        "Reducing this value improves performance."
+                        "Only fetch task sessions (for backup metrics) and malware events "
+                        "younger than this. Reducing this value improves performance."
                     ),
                     displayed_magnitudes=[TimeMagnitude.HOUR, TimeMagnitude.DAY],
                     prefill=DefaultValue(86400),  # 24 hours

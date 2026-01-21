@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.38] - 2026-01-21
+
+### Changed
+- **Renamed Option**: "Maximum Session/Task Age" → "Maximum Task/Malware Event Age"
+  - Clarifies that this filters task sessions (for backup metrics) and malware events
+  - Sessions section was removed in 0.0.33, name was outdated
+
 ## [0.0.37] - 2026-01-21
 
 ### Changed
