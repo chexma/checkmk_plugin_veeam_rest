@@ -127,7 +127,7 @@ def check_veeam_rest_backup_objects(
 
     yield Result(state=result_state, summary=summary)
 
-    # Check for warning/error info from session logs (e.g., VSS errors)
+    # Check for warning/error info from task sessions (e.g., VSS errors)
     warning_info = obj.get("warningInfo")
     if warning_info:
         warning_title = warning_info.get("warningTitle", "Unknown")

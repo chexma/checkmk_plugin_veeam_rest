@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.42] - 2026-01-21
+
+### Fixed
+- **VM-specific Job Warnings/Errors**: Fixed warning detection to use task sessions instead of session logs
+  - Session logs don't contain per-VM warning details in a parseable format
+  - Now uses task sessions API (`/api/v1/taskSessions`) to find VMs with Warning/Failed results
+  - Correctly matches task sessions to their parent job session
+  - VMs with warning/failed task results now properly show WARNING/CRITICAL state
+
 ## [0.0.41] - 2026-01-21
 
 ### Added

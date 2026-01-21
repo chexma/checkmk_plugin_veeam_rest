@@ -422,6 +422,25 @@ class VeeamRestAPI:
         """Get backup objects for a specific backup."""
         return self._get_paginated(f"/api/v1/backups/{backup_id}/objects")
 
+    def get_task_sessions_for_session(self, session_id: str, created_after: str | None = None) -> list[dict]:
+        """Get task sessions for a specific parent session.
+
+        Fetches task sessions filtered by time and filters by sessionId in Python.
+
+        Args:
+            session_id: The parent session ID to filter by.
+            created_after: Optional timestamp to filter task sessions.
+
+        Returns task sessions with: id, name, result, sessionId, etc.
+        """
+        params = {}
+        if created_after:
+            params["createdAfterFilter"] = created_after
+        all_tasks = self._get_paginated("/api/v1/taskSessions", params)
+
+        # Filter to only tasks belonging to this session
+        return [t for t in all_tasks if t.get("sessionId") == session_id]
+
     def get_backup_objects_with_job_info(self) -> list[dict]:
         """Get all backup objects enriched with job name and warning info.
 
@@ -429,14 +448,14 @@ class VeeamRestAPI:
         - 1 call to /api/v1/backupObjects (all objects)
         - 1 call to /api/v1/backups (job name mapping)
         - 1 call to /api/v1/jobs/states (for warning detection)
-        - N calls to /api/v1/sessions/{id}/logs (only for warning jobs, typically 0-2)
+        - 1 call to /api/v1/taskSessions (for warning jobs, to get per-VM results)
         Instead of 34+ individual calls per backup.
 
         Objects with no restore points are filtered out (typically VMs that
         were removed from the backup job but still have orphaned metadata).
 
-        For jobs with Warning result, session logs are fetched to identify
-        which specific VMs had warnings (e.g., VSS errors).
+        For jobs with Warning/Failed result, task sessions are checked to identify
+        which specific VMs had warnings/errors (e.g., VSS failures).
         """
         # Fetch all backups to build backupId -> jobName mapping (1 API call)
         backups = self.get_backups()
@@ -446,53 +465,72 @@ class VeeamRestAPI:
         }
         logger.debug("Built backup info mapping for %d backups", len(backup_info))
 
-        # Fetch job states to identify warning jobs and get session IDs
+        # Fetch job states to identify warning/failed jobs and get session IDs
         jobs = self.get_job_states()
         job_by_name: dict[str, dict] = {}
+        warning_session_ids: set[str] = set()  # Session IDs with Warning/Failed result
         for job in jobs:
             job_name = job.get("name")
             if job_name:
+                job_result = job.get("lastResult")
+                session_id = job.get("sessionId")
                 job_by_name[job_name] = {
-                    "lastResult": job.get("lastResult"),
-                    "sessionId": job.get("sessionId"),
+                    "lastResult": job_result,
+                    "sessionId": session_id,
                 }
-        logger.debug("Built job state mapping for %d jobs", len(job_by_name))
+                # Track sessions that had issues
+                if job_result in ("Warning", "Failed") and session_id:
+                    warning_session_ids.add(session_id)
+        logger.debug("Built job state mapping for %d jobs, %d with warnings/failures",
+                    len(job_by_name), len(warning_session_ids))
 
-        # For warning/failed jobs: fetch session logs to get per-VM issues
-        issue_logs_by_vm: dict[str, dict] = {}  # vm_name.lower() -> issue info
-        jobs_with_issues = 0
-        for job_name, job_data in job_by_name.items():
-            job_result = job_data.get("lastResult")
-            session_id = job_data.get("sessionId")
+        # For warning/failed jobs: fetch task sessions to get per-VM results
+        # Task sessions have result.result field that can be "Warning" or "Failed"
+        issue_tasks_by_vm: dict[str, dict] = {}  # vm_name.lower() -> issue info
+        if warning_session_ids:
+            try:
+                # Fetch all recent task sessions (API doesn't support sessionId filter)
+                all_tasks = self.get_task_sessions()
+                logger.debug("Fetched %d task sessions", len(all_tasks))
 
-            # Fetch logs for Warning and Failed jobs
-            if job_result in ("Warning", "Failed") and session_id:
-                jobs_with_issues += 1
-                try:
-                    # For Warning jobs, fetch Warning logs; for Failed, fetch Failed logs
-                    status_filter = job_result
-                    logs = self.get_session_logs(session_id, status_filter=status_filter)
-                    logger.debug("Fetched %d %s logs for job '%s'", len(logs), status_filter, job_name)
+                # Filter to tasks from warning/failed sessions and check their results
+                for task in all_tasks:
+                    task_session_id = task.get("sessionId")
+                    if task_session_id not in warning_session_ids:
+                        continue
 
-                    for log in logs:
-                        # Log title contains VM name
-                        vm_name = log.get("title", "").lower()
-                        if vm_name:
-                            # Only overwrite if new issue is more severe (Failed > Warning)
-                            existing = issue_logs_by_vm.get(vm_name)
-                            if not existing or (job_result == "Failed" and existing.get("severity") != "Failed"):
-                                issue_logs_by_vm[vm_name] = {
-                                    "warningMessage": log.get("description", ""),
-                                    "warningTitle": log.get("title", ""),
-                                    "jobName": job_name,
-                                    "severity": job_result,  # "Warning" or "Failed"
-                                }
-                except Exception as e:
-                    logger.warning("Failed to fetch session logs for job '%s': %s", job_name, e)
+                    task_result = task.get("result", {})
+                    task_result_status = task_result.get("result")
+                    task_result_message = task_result.get("message", "")
 
-        if jobs_with_issues > 0:
-            logger.info("Fetched issue logs from %d jobs, found %d VMs with issues",
-                       jobs_with_issues, len(issue_logs_by_vm))
+                    # Only track tasks with Warning or Failed result
+                    if task_result_status not in ("Warning", "Failed"):
+                        continue
+
+                    vm_name = task.get("name", "").lower()
+                    if not vm_name:
+                        continue
+
+                    # Find the job name for this session
+                    job_name_for_task = None
+                    for jn, jd in job_by_name.items():
+                        if jd.get("sessionId") == task_session_id:
+                            job_name_for_task = jn
+                            break
+
+                    # Only overwrite if new issue is more severe (Failed > Warning)
+                    existing = issue_tasks_by_vm.get(vm_name)
+                    if not existing or (task_result_status == "Failed" and existing.get("severity") != "Failed"):
+                        issue_tasks_by_vm[vm_name] = {
+                            "warningMessage": task_result_message,
+                            "warningTitle": task.get("name", ""),
+                            "jobName": job_name_for_task or "",
+                            "severity": task_result_status,  # "Warning" or "Failed"
+                        }
+
+                logger.info("Found %d VMs with warning/failed task results", len(issue_tasks_by_vm))
+            except Exception as e:
+                logger.warning("Failed to fetch task sessions for warning detection: %s", e)
 
         # Fetch all objects in bulk (1 API call instead of 34+)
         all_objects = self.get_backup_objects()
@@ -512,10 +550,10 @@ class VeeamRestAPI:
                 if backup_info[backup_id]["jobType"]:
                     obj["jobType"] = backup_info[backup_id]["jobType"]
 
-            # Add warning info if this VM has a warning from session logs
+            # Add warning info if this VM has a warning/failed task result
             obj_name = obj.get("name", "").lower()
-            if obj_name in issue_logs_by_vm:
-                obj["warningInfo"] = issue_logs_by_vm[obj_name]
+            if obj_name in issue_tasks_by_vm:
+                obj["warningInfo"] = issue_tasks_by_vm[obj_name]
 
             result.append(obj)
 
