@@ -59,6 +59,24 @@ See [Installation Guide](installation.md) for detailed setup instructions includ
 | Veeam Repositories | Veeam Repository * | Usage levels, free space thresholds |
 | Veeam License | Veeam License | Expiration thresholds, instance usage |
 
+## Performance Optimization
+
+### Restore Points Filter
+
+For large environments with many VMs and long backup history, fetching all restore points can be slow (e.g., 12,000+ restore points = 100+ seconds). The agent filters restore points by age to dramatically improve performance:
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| Restore Points Age | 7 days | Only fetch restore points from the last N days |
+
+**Impact Example (105 VMs):**
+- Without filter: 12,709 restore points, 104 seconds
+- With 7-day filter: ~735 restore points, 3-5 seconds
+
+Configure in: Setup > Agents > Other integrations > Veeam Backup & Replication (REST API)
+
+**Note:** VMs without a backup in the configured time window will show no backup age, which can indicate a backup problem.
+
 ## Caching
 
 The agent supports per-section caching to reduce API load:

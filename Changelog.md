@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.36] - 2026-01-21
+
+### Added
+- **Restore Points Time Filter**: New `--restore-points-days` parameter (default: 7 days)
+  - Filters restore points by creation time using `createdAfterFilter` API parameter
+  - Dramatically improves performance in large environments
+  - **Example**: 12,709 restore points → 2,765 restore points (~78% reduction)
+  - **Time saved**: 104 seconds → 6 seconds (~94% faster)
+  - Configurable via GUI: "Restore Points Age (Days)" in special agent settings
+  - Set to 0 to disable filtering (not recommended for large environments)
+
+### Changed
+- **Debug Script**: Updated `debug_veeam_api.py` with restore points filter
+  - New `--restore-points-days` CLI option
+  - Performance test now uses filtered bulk API call
+  - Shows filter timestamp in output
+
 ## [0.0.35] - 2026-01-20
 
 ### Changed

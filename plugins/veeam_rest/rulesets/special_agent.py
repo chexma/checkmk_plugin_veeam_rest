@@ -192,6 +192,19 @@ def _parameter_form() -> Dictionary:
                     prefill=DefaultValue(86400),  # 24 hours
                 ),
             ),
+            "restore_points_days": DictElement(
+                required=False,
+                parameter_form=Integer(
+                    title=Title("Restore Points Age (Days)"),
+                    help_text=Help(
+                        "Only fetch restore points from the last N days. "
+                        "This dramatically improves performance in large environments. "
+                        "Default: 7 days. Set to 0 to fetch all (not recommended)."
+                    ),
+                    prefill=DefaultValue(7),
+                    custom_validate=(validators.NumberInRange(min_value=0, max_value=365),),
+                ),
+            ),
             # Caching options
             "no_cache": DictElement(
                 required=False,

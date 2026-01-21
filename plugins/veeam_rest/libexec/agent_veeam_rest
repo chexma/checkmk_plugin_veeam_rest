@@ -463,17 +463,24 @@ class VeeamRestAPI:
         """Get restore points for a specific backup object."""
         return self._get_paginated(f"/api/v1/backupObjects/{object_id}/restorePoints")
 
-    def get_all_restore_points(self) -> list[dict]:
+    def get_all_restore_points(self, created_after: str | None = None) -> list[dict]:
         """Get all restore points from the backup server.
 
         This is much more efficient than calling get_object_restore_points()
         for each object individually. For 500 VMs, this reduces API calls
         from ~500 to ~1-5 (paginated).
 
+        Args:
+            created_after: Optional ISO 8601 timestamp to filter restore points.
+                          Only returns restore points created after this time.
+
         Returns restore points with: id, name, creationTime, malwareStatus, backupId, etc.
         The 'name' field contains the object name for matching.
         """
-        return self._get_paginated("/api/v1/restorePoints")
+        params = {}
+        if created_after:
+            params["createdAfterFilter"] = created_after
+        return self._get_paginated("/api/v1/restorePoints", params)
 
     def get_malware_events(self, created_after: str | None = None) -> list[dict]:
         """Get malware detection events.
@@ -870,6 +877,12 @@ def parse_arguments() -> argparse.Namespace:
         help="Max session/task age in seconds (default: 86400 = 24h)"
     )
     parser.add_argument(
+        "--restore-points-days",
+        type=int,
+        default=7,
+        help="Only fetch restore points from the last N days (default: 7, 0=all)"
+    )
+    parser.add_argument(
         "-v", "--verbose",
         action="count",
         default=0,
@@ -1031,11 +1044,20 @@ def main() -> int:
             try:
                 backup_objects = api.get_backup_objects_with_job_info()
 
-                # Fetch ALL restore points in bulk (1-5 calls instead of 500+)
+                # Fetch restore points in bulk with optional time filter
                 # This is the major performance optimization for large environments
                 all_restore_points: list[dict] | None = None
                 try:
-                    all_restore_points = api.get_all_restore_points()
+                    # Apply time filter if configured (default: 7 days)
+                    rp_created_after: str | None = None
+                    if args.restore_points_days > 0:
+                        rp_created_after = (
+                            datetime.now(timezone.utc) - timedelta(days=args.restore_points_days)
+                        ).strftime("%Y-%m-%dT%H:%M:%SZ")
+                        if args.debug:
+                            sys.stderr.write(f"Filtering restore points to last {args.restore_points_days} days\n")
+
+                    all_restore_points = api.get_all_restore_points(rp_created_after)
                     if args.debug:
                         sys.stderr.write(f"Fetched {len(all_restore_points)} restore points in bulk\n")
                 except VeeamAPIError as e:

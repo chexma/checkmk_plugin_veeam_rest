@@ -70,6 +70,10 @@ def _agent_arguments(
     if "session_age" in params:
         args.extend(["--session-age", str(int(params["session_age"]))])
 
+    # Restore points age filter (default: 7 days)
+    restore_points_days = params.get("restore_points_days", 7)
+    args.extend(["--restore-points-days", str(restore_points_days)])
+
     # Caching options
     if params.get("no_cache", False):
         args.append("--no-cache")
