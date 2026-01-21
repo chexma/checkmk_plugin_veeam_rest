@@ -865,6 +865,7 @@ The password will be prompted securely (hidden input).
         ("jobs/states", "Job States"),
         ("backups", "Backups"),
         ("backupObjects", "Backup Objects"),
+        ("taskSessions", "Task Sessions"),
         ("restorePoints", "Restore Points (Bulk)"),
     ]
     for endpoint, name in core_endpoints:
@@ -984,7 +985,90 @@ The password will be prompted securely (hidden input).
                 print(f"      - {status}: {count}")
 
     # =========================================================================
-    # TEST 8: Performance Test (Bulk vs Per-Object API Calls)
+    # TEST 8: Warning Detection Test (Task Sessions)
+    # =========================================================================
+    print_header("8. WARNING DETECTION TEST")
+
+    # Check for jobs with Warning/Failed result
+    print_subheader("Jobs with Warning/Failed Status")
+    warning_jobs = []
+    if jobs_data:
+        jobs = jobs_data.get("data", []) if isinstance(jobs_data, dict) else jobs_data
+        for job in jobs:
+            result = job.get("lastResult")
+            if result in ("Warning", "Failed"):
+                warning_jobs.append({
+                    "name": job.get("name"),
+                    "result": result,
+                    "sessionId": job.get("sessionId"),
+                    "lastRun": job.get("lastRun"),
+                })
+                print(f"  {warn(f'{job.get(\"name\")}: {result}')}")
+                print(f"    Session ID: {job.get('sessionId')}")
+
+    if not warning_jobs:
+        print(info("No jobs with Warning or Failed status found"))
+
+    # Test task sessions fetch with time filter
+    if warning_jobs:
+        print_subheader("Task Sessions (Warning Detection)")
+
+        # Fetch with 24h filter
+        from datetime import timedelta, timezone
+        created_after_24h = (
+            datetime.now(timezone.utc) - timedelta(hours=24)
+        ).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+        tasks_filtered, task_time, task_calls = api_get_paginated(
+            session, base_url, "taskSessions", token, verify_ssl,
+            extra_params={"createdAfterFilter": created_after_24h}
+        )
+        print(f"  {ok(f'Fetched {len(tasks_filtered)} task sessions (24h filter) in {task_time:.0f}ms')}")
+        timing.add("taskSessions (24h filter)", task_time, task_calls)
+
+        # Check for VMs with Warning/Failed results in warning sessions
+        warning_session_ids = {j["sessionId"] for j in warning_jobs if j.get("sessionId")}
+        vms_with_issues = []
+
+        for task in tasks_filtered:
+            if task.get("sessionId") not in warning_session_ids:
+                continue
+            task_result = task.get("result", {}).get("result")
+            if task_result in ("Warning", "Failed"):
+                vms_with_issues.append({
+                    "name": task.get("name"),
+                    "result": task_result,
+                    "message": task.get("result", {}).get("message", ""),
+                    "sessionId": task.get("sessionId"),
+                })
+
+        if vms_with_issues:
+            print(f"\n  {Colors.BOLD}VMs with Warning/Failed task results:{Colors.END}")
+            for vm in vms_with_issues[:20]:
+                status_color = Colors.RED if vm["result"] == "Failed" else Colors.YELLOW
+                print(f"    {status_color}[{vm['result']}]{Colors.END} {redact(vm['name'])}")
+                if vm["message"]:
+                    print(f"           Message: {redact(vm['message'][:100])}")
+            if len(vms_with_issues) > 20:
+                print(f"    ... and {len(vms_with_issues) - 20} more")
+        else:
+            print(info("No VMs with Warning/Failed task results found in warning sessions"))
+
+        # Compare with unfiltered fetch
+        print_subheader("Task Sessions Performance Comparison")
+        tasks_all, task_all_time, task_all_calls = api_get_paginated(
+            session, base_url, "taskSessions", token, verify_ssl
+        )
+        print(f"  All task sessions:     {len(tasks_all):>6} items in {task_all_time:>6.0f}ms ({task_all_calls} calls)")
+        print(f"  Filtered (24h):        {len(tasks_filtered):>6} items in {task_time:>6.0f}ms ({task_calls} calls)")
+        timing.add("taskSessions (ALL)", task_all_time, task_all_calls)
+
+        if task_all_time > 0:
+            speedup = task_all_time / task_time if task_time > 0 else 0
+            print(f"\n  {Colors.GREEN}Filtered fetch is ~{speedup:.1f}x faster{Colors.END}")
+
+    # =========================================================================
+    # TEST 9: Performance Test (Bulk vs Per-Object API Calls)
     # =========================================================================
     run_performance_test(
         session, base_url, token, verify_ssl, timing,

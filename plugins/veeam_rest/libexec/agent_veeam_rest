@@ -441,14 +441,14 @@ class VeeamRestAPI:
         # Filter to only tasks belonging to this session
         return [t for t in all_tasks if t.get("sessionId") == session_id]
 
-    def get_backup_objects_with_job_info(self) -> list[dict]:
+    def get_backup_objects_with_job_info(self, created_after: str | None = None) -> list[dict]:
         """Get all backup objects enriched with job name and warning info.
 
         Uses bulk endpoints and joins in Python for performance:
         - 1 call to /api/v1/backupObjects (all objects)
         - 1 call to /api/v1/backups (job name mapping)
         - 1 call to /api/v1/jobs/states (for warning detection)
-        - 1 call to /api/v1/taskSessions (for warning jobs, to get per-VM results)
+        - 1 call to /api/v1/taskSessions (for warning jobs, filtered by time)
         Instead of 34+ individual calls per backup.
 
         Objects with no restore points are filtered out (typically VMs that
@@ -456,6 +456,10 @@ class VeeamRestAPI:
 
         For jobs with Warning/Failed result, task sessions are checked to identify
         which specific VMs had warnings/errors (e.g., VSS failures).
+
+        Args:
+            created_after: Optional ISO timestamp to filter task sessions.
+                          Only task sessions created after this time are fetched.
         """
         # Fetch all backups to build backupId -> jobName mapping (1 API call)
         backups = self.get_backups()
@@ -489,9 +493,9 @@ class VeeamRestAPI:
         issue_tasks_by_vm: dict[str, dict] = {}  # vm_name.lower() -> issue info
         if warning_session_ids:
             try:
-                # Fetch all recent task sessions (API doesn't support sessionId filter)
-                all_tasks = self.get_task_sessions()
-                logger.debug("Fetched %d task sessions", len(all_tasks))
+                # Fetch recent task sessions with time filter (API doesn't support sessionId filter)
+                all_tasks = self.get_task_sessions(created_after)
+                logger.debug("Fetched %d task sessions (filtered)", len(all_tasks))
 
                 # Filter to tasks from warning/failed sessions and check their results
                 for task in all_tasks:
@@ -1159,7 +1163,7 @@ def main() -> int:
         enriched_backup_objects: list[dict] | None = None
         if args.backup_mode or args.malware_mode:
             try:
-                backup_objects = api.get_backup_objects_with_job_info()
+                backup_objects = api.get_backup_objects_with_job_info(created_after)
 
                 # Fetch restore points in bulk with optional time filter
                 # This is the major performance optimization for large environments

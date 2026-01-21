@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.43] - 2026-01-21
+
+### Fixed
+- **Performance: Task Sessions Filter**: Fixed slow task session fetching for warning detection
+  - Task sessions now filtered by `createdAfterFilter` parameter (uses `--session-age` setting)
+  - Previously fetched ALL task sessions which caused major slowdowns in large environments
+  - Example: 50,000 task sessions → ~500 (24h filter) = ~100x faster
+
+### Added
+- **Debug Script**: New warning detection test section
+  - Shows jobs with Warning/Failed status
+  - Tests task sessions performance (filtered vs unfiltered)
+  - Lists VMs with warning/failed task results
+  - Helps diagnose warning detection issues
+
 ## [0.0.42] - 2026-01-21
 
 ### Fixed
