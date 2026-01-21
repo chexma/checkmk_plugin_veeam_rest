@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.44] - 2026-01-21
+
+### Fixed
+- **Filter Orphaned Backup Objects**: Exclude "outdated_" backup objects from discovery
+  - Objects without `backupId` are now filtered out (orphaned/old backups)
+  - These objects had `restorePointsCount > 0` but no active job association
+  - Prevents "Veeam Backup outdated_*" services from being created
+
 ## [0.0.43] - 2026-01-21
 
 ### Fixed

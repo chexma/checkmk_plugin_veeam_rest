@@ -547,8 +547,12 @@ class VeeamRestAPI:
             if obj.get("restorePointsCount", 0) == 0:
                 continue
 
-            # Add job info from backup mapping
+            # Skip orphaned objects without backupId (old/outdated backups not part of any job)
             backup_id = obj.get("backupId")
+            if not backup_id:
+                continue
+
+            # Add job info from backup mapping
             if backup_id and backup_id in backup_info:
                 obj["jobName"] = backup_info[backup_id]["jobName"]
                 if backup_info[backup_id]["jobType"]:
