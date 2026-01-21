@@ -12,19 +12,25 @@ Tests performed:
 3. OAuth2 authentication with provided credentials
 4. REST API endpoints (jobs, repositories, proxies, etc.)
 5. License and server information
-6. Session and task data
+6. Backup objects and restore points
+7. Malware detection events
+8. Performance comparison (bulk vs per-object API calls)
 
 Additionally shows timing summary for all API calls to help identify
 performance bottlenecks.
 
 Usage:
-    python3 debug_veeam_api.py --host 192.168.1.1 --user 'DOMAIN\\admin' --password SECRET
-    python3 debug_veeam_api.py --host veeam.local --user admin@domain.com --password SECRET --redact
+    python3 debug_veeam_api.py --host 192.168.1.1 --user 'DOMAIN\\admin'
+    python3 debug_veeam_api.py --host veeam.local --user admin@domain.com --redact
+    python3 debug_veeam_api.py --host veeam.local --user admin --perf-objects 50
+
+The password will be prompted securely (hidden input).
 """
 
 from __future__ import annotations
 
 import argparse
+import getpass
 import json
 import socket
 import ssl
@@ -129,11 +135,11 @@ class TimingTracker:
     """Track timing for API calls."""
 
     def __init__(self):
-        self.timings: List[Tuple[str, float]] = []
+        self.timings: List[Tuple[str, float, int]] = []  # (name, elapsed_ms, count)
         self.start_time = time.time()
 
-    def add(self, name: str, elapsed_ms: float) -> None:
-        self.timings.append((name, elapsed_ms))
+    def add(self, name: str, elapsed_ms: float, count: int = 1) -> None:
+        self.timings.append((name, elapsed_ms, count))
 
     def get_total_time(self) -> float:
         return (time.time() - self.start_time) * 1000
@@ -148,21 +154,24 @@ class TimingTracker:
         sorted_timings = sorted(self.timings, key=lambda x: x[1], reverse=True)
 
         print(f"\n{Colors.BOLD}Individual API Calls (sorted by duration):{Colors.END}")
-        print("-" * 50)
+        print("-" * 60)
 
         total_api_time = 0.0
-        for name, elapsed in sorted_timings:
+        total_calls = 0
+        for name, elapsed, count in sorted_timings:
             total_api_time += elapsed
+            total_calls += count
             if elapsed > 1000:
                 color = Colors.RED
             elif elapsed > 500:
                 color = Colors.YELLOW
             else:
                 color = Colors.GREEN
-            print(f"  {color}{elapsed:>8.0f}ms{Colors.END}  {name}")
+            count_str = f" ({count} calls)" if count > 1 else ""
+            print(f"  {color}{elapsed:>8.0f}ms{Colors.END}  {name}{count_str}")
 
-        print("-" * 50)
-        print(f"  {Colors.BOLD}{total_api_time:>8.0f}ms{Colors.END}  Total API time")
+        print("-" * 60)
+        print(f"  {Colors.BOLD}{total_api_time:>8.0f}ms{Colors.END}  Total API time ({total_calls} calls)")
 
         total_time = self.get_total_time()
         print(f"  {Colors.BOLD}{total_time:>8.0f}ms{Colors.END}  Total script time")
@@ -419,6 +428,84 @@ def get_oauth_token(
         return None
 
 
+def api_get(
+    session: requests.Session,
+    base_url: str,
+    endpoint: str,
+    token: str,
+    verify_ssl: bool,
+    timeout: int = 30,
+) -> Tuple[Optional[Any], float]:
+    """Make a GET request to the API and return (data, elapsed_ms)."""
+    url = f"{base_url}/api/v1/{endpoint}"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "x-api-version": API_VERSION,
+        "Accept": "application/json",
+    }
+
+    start = time.time()
+    response = session.get(url, headers=headers, timeout=timeout, verify=verify_ssl)
+    elapsed = (time.time() - start) * 1000
+
+    if response.status_code == 200:
+        return response.json(), elapsed
+    return None, elapsed
+
+
+def api_get_paginated(
+    session: requests.Session,
+    base_url: str,
+    endpoint: str,
+    token: str,
+    verify_ssl: bool,
+    limit: int = 500,
+) -> Tuple[List[dict], float, int]:
+    """Get all items from a paginated endpoint. Returns (items, total_ms, call_count)."""
+    all_items = []
+    skip = 0
+    total_ms = 0.0
+    call_count = 0
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "x-api-version": API_VERSION,
+        "Accept": "application/json",
+    }
+
+    while True:
+        url = f"{base_url}/api/v1/{endpoint}?limit={limit}&skip={skip}"
+        start = time.time()
+        response = session.get(url, headers=headers, timeout=60, verify=verify_ssl)
+        elapsed = (time.time() - start) * 1000
+        total_ms += elapsed
+        call_count += 1
+
+        if response.status_code != 200:
+            break
+
+        data = response.json()
+        items = data.get("data", []) if isinstance(data, dict) else data
+
+        if not items:
+            break
+
+        all_items.extend(items)
+
+        # Check pagination
+        if isinstance(data, dict):
+            pagination = data.get("pagination", {})
+            total = pagination.get("total", len(items))
+            if skip + len(items) >= total:
+                break
+        elif len(items) < limit:
+            break
+
+        skip += limit
+
+    return all_items, total_ms, call_count
+
+
 def test_api_endpoint(
     session: requests.Session,
     base_url: str,
@@ -467,7 +554,12 @@ def test_api_endpoint(
         if show_data or not status_ok:
             try:
                 json_resp = response.json()
-                if isinstance(json_resp, list):
+                if isinstance(json_resp, dict) and "data" in json_resp:
+                    items = json_resp["data"]
+                    print(f"    Response: {len(items)} items")
+                    if items and show_data:
+                        print(f"    First item: {redact(json.dumps(items[0], indent=4)[:500])}")
+                elif isinstance(json_resp, list):
                     print(f"    Response: {len(json_resp)} items")
                     if json_resp and show_data:
                         print(f"    First item: {redact(json.dumps(json_resp[0], indent=4)[:500])}")
@@ -496,6 +588,87 @@ def test_api_endpoint(
         return None
 
 
+def run_performance_test(
+    session: requests.Session,
+    base_url: str,
+    token: str,
+    verify_ssl: bool,
+    timing: TimingTracker,
+    max_objects: int = 10,
+) -> None:
+    """Run performance comparison between bulk and per-object API calls."""
+    print_header("PERFORMANCE TEST: Bulk vs Per-Object API Calls")
+
+    print_subheader("Fetching Backup Objects")
+
+    # Get backup objects
+    backup_objects, bo_time, bo_calls = api_get_paginated(
+        session, base_url, "backupObjects", token, verify_ssl
+    )
+    print(f"  {ok(f'Fetched {len(backup_objects)} backup objects in {bo_time:.0f}ms ({bo_calls} calls)')}")
+    timing.add("backupObjects (paginated)", bo_time, bo_calls)
+
+    if not backup_objects:
+        print(warn("No backup objects found - skipping performance test"))
+        return
+
+    # Test bulk restore points fetch
+    print_subheader("Bulk Restore Points (NEW - Optimized)")
+
+    all_rp, bulk_time, bulk_calls = api_get_paginated(
+        session, base_url, "restorePoints", token, verify_ssl
+    )
+    print(f"  {ok(f'Fetched {len(all_rp)} restore points in {bulk_time:.0f}ms ({bulk_calls} calls)')}")
+    timing.add("restorePoints BULK (all)", bulk_time, bulk_calls)
+
+    # Test per-object restore points (limited to max_objects)
+    print_subheader(f"Per-Object Restore Points (OLD - first {max_objects} objects)")
+
+    test_objects = backup_objects[:max_objects]
+    per_object_total = 0.0
+    per_object_count = 0
+    per_object_rp_count = 0
+
+    for obj in test_objects:
+        object_id = obj.get("id")
+        if not object_id:
+            continue
+
+        try:
+            rp_data, rp_time = api_get(
+                session, base_url, f"backupObjects/{object_id}/restorePoints",
+                token, verify_ssl
+            )
+            per_object_total += rp_time
+            per_object_count += 1
+            if rp_data:
+                items = rp_data.get("data", []) if isinstance(rp_data, dict) else rp_data
+                per_object_rp_count += len(items) if isinstance(items, list) else 0
+        except Exception as e:
+            print(f"    {warn(f'Error for object {object_id}: {e}')}")
+
+    avg_per_call = per_object_total / per_object_count if per_object_count > 0 else 0
+    print(f"  Tested {per_object_count} objects: {per_object_total:.0f}ms total, {avg_per_call:.0f}ms avg/call")
+    print(f"  Found {per_object_rp_count} restore points for tested objects")
+    timing.add(f"restorePoints PER-OBJECT ({per_object_count} objects)", per_object_total, per_object_count)
+
+    # Extrapolation
+    print_subheader("Performance Comparison")
+
+    total_objects = len(backup_objects)
+    estimated_per_object = avg_per_call * total_objects
+
+    print(f"\n  {Colors.BOLD}For {total_objects} backup objects:{Colors.END}")
+    print(f"    Bulk API (optimized):     {bulk_time:>8.0f}ms  ({bulk_calls} calls)")
+    print(f"    Per-Object (estimated):   {estimated_per_object:>8.0f}ms  ({total_objects} calls)")
+
+    if estimated_per_object > 0:
+        speedup = estimated_per_object / bulk_time if bulk_time > 0 else 0
+        savings = estimated_per_object - bulk_time
+        print(f"\n  {Colors.GREEN}Bulk API is ~{speedup:.1f}x faster ({savings:.0f}ms saved){Colors.END}")
+        print(f"  {Colors.GREEN}API calls reduced from {total_objects} to {bulk_calls}{Colors.END}")
+
+
 # =============================================================================
 # Main Function
 # =============================================================================
@@ -507,14 +680,17 @@ def main() -> int:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-    python3 debug_veeam_api.py --host 192.168.1.1 --user 'DOMAIN\\admin' --password secret
-    python3 debug_veeam_api.py --host veeam.local --user admin@domain.com --password secret --no-cert-check
-    python3 debug_veeam_api.py --host 192.168.1.1 --user Administrator --password secret --redact
+    python3 debug_veeam_api.py --host 192.168.1.1 --user 'DOMAIN\\admin'
+    python3 debug_veeam_api.py --host veeam.local --user admin@domain.com --no-cert-check
+    python3 debug_veeam_api.py --host 192.168.1.1 --user Administrator --redact
+    python3 debug_veeam_api.py --host veeam.local --user admin --perf-objects 50
+
+The password will be prompted securely (hidden input).
         """,
     )
     parser.add_argument("--host", required=True, help="Veeam server IP or hostname")
     parser.add_argument("--user", required=True, help="Username (DOMAIN\\user or user@domain)")
-    parser.add_argument("--password", required=True, help="Password for authentication")
+    parser.add_argument("--password", help="Password (will prompt securely if not provided)")
     parser.add_argument("--port", type=int, default=9419, help="REST API port (default: 9419)")
     parser.add_argument("--no-cert-check", action="store_true", help="Disable SSL certificate verification")
     parser.add_argument("--no-color", action="store_true", help="Disable colored output")
@@ -523,8 +699,19 @@ Examples:
         action="store_true",
         help="Redact server names and hostnames in output for sharing logs",
     )
+    parser.add_argument(
+        "--perf-objects",
+        type=int,
+        default=10,
+        help="Number of objects to test in per-object performance comparison (default: 10)",
+    )
 
     args = parser.parse_args()
+
+    # Prompt for password securely if not provided
+    password = args.password
+    if not password:
+        password = getpass.getpass(f"Password for {args.user}: ")
 
     if args.no_color or not sys.stdout.isatty():
         Colors.disable()
@@ -532,7 +719,7 @@ Examples:
     global REDACT_ENABLED, REDACT_VALUES
     if args.redact:
         REDACT_ENABLED = True
-        REDACT_VALUES = [args.host, args.user]
+        REDACT_VALUES = [args.host, args.user, password]
 
     verify_ssl = not args.no_cert_check
     base_url = f"https://{args.host}:{args.port}"
@@ -582,7 +769,7 @@ Examples:
     print_header("3. AUTHENTICATION")
 
     token = get_oauth_token(
-        session, base_url, args.user, args.password, verify_ssl, results, timing
+        session, base_url, args.user, password, verify_ssl, results, timing
     )
 
     if not token:
@@ -645,12 +832,13 @@ Examples:
     print_header("6. REST API ENDPOINTS")
 
     print_subheader("Core Endpoints")
-    endpoints = [
+    core_endpoints = [
         ("jobs/states", "Job States"),
-        ("sessions", "Sessions"),
-        ("taskSessions", "Task Sessions"),
+        ("backups", "Backups"),
+        ("backupObjects", "Backup Objects"),
+        ("restorePoints", "Restore Points (Bulk)"),
     ]
-    for endpoint, name in endpoints:
+    for endpoint, name in core_endpoints:
         data = test_api_endpoint(
             session, base_url, endpoint, token, name,
             results, "API", verify_ssl, timing
@@ -678,20 +866,28 @@ Examples:
         elif data and isinstance(data, list):
             print(f"    Found: {len(data)} items")
 
+    print_subheader("Security Endpoints")
+    security_endpoints = [
+        ("malwareDetection/events", "Malware Events"),
+    ]
+    for endpoint, name in security_endpoints:
+        data = test_api_endpoint(
+            session, base_url, endpoint, token, name,
+            results, "Security", verify_ssl, timing
+        )
+        if data and isinstance(data, dict) and "data" in data:
+            print(f"    Found: {len(data['data'])} items")
+        elif data and isinstance(data, list):
+            print(f"    Found: {len(data)} items")
+
     # =========================================================================
     # TEST 7: Data Summary
     # =========================================================================
     print_header("7. DATA SUMMARY")
 
     # Get jobs
-    jobs_response = session.get(
-        f"{base_url}/api/v1/jobs/states",
-        headers={"Authorization": f"Bearer {token}", "x-api-version": API_VERSION},
-        timeout=30,
-        verify=verify_ssl,
-    )
-    if jobs_response.status_code == 200:
-        jobs_data = jobs_response.json()
+    jobs_data, _ = api_get(session, base_url, "jobs/states", token, verify_ssl)
+    if jobs_data:
         jobs = jobs_data.get("data", []) if isinstance(jobs_data, dict) else jobs_data
         print(f"\n  {Colors.BOLD}Jobs ({len(jobs)}):{Colors.END}")
         for job in jobs[:10]:
@@ -704,14 +900,8 @@ Examples:
             print(f"    ... and {len(jobs) - 10} more")
 
     # Get repositories
-    repos_response = session.get(
-        f"{base_url}/api/v1/backupInfrastructure/repositories/states",
-        headers={"Authorization": f"Bearer {token}", "x-api-version": API_VERSION},
-        timeout=30,
-        verify=verify_ssl,
-    )
-    if repos_response.status_code == 200:
-        repos_data = repos_response.json()
+    repos_data, _ = api_get(session, base_url, "backupInfrastructure/repositories/states", token, verify_ssl)
+    if repos_data:
         repos = repos_data.get("data", []) if isinstance(repos_data, dict) else repos_data
         print(f"\n  {Colors.BOLD}Repositories ({len(repos)}):{Colors.END}")
         for repo in repos[:10]:
@@ -723,6 +913,41 @@ Examples:
             print(f"    - [{repo_type}] {redact(repo_name)}: {capacity:.1f}GB capacity, {free:.1f}GB free, {online}")
         if len(repos) > 10:
             print(f"    ... and {len(repos) - 10} more")
+
+    # Get backup objects count
+    bo_data, _ = api_get(session, base_url, "backupObjects", token, verify_ssl)
+    if bo_data:
+        backup_objects = bo_data.get("data", []) if isinstance(bo_data, dict) else bo_data
+        print(f"\n  {Colors.BOLD}Backup Objects ({len(backup_objects)}):{Colors.END}")
+        # Group by platform
+        by_platform: Dict[str, int] = {}
+        for obj in backup_objects:
+            platform = obj.get("platformName", "Unknown")
+            by_platform[platform] = by_platform.get(platform, 0) + 1
+        for platform, count in sorted(by_platform.items(), key=lambda x: -x[1]):
+            print(f"    - {platform}: {count} objects")
+
+    # Get restore points count
+    rp_data, _ = api_get(session, base_url, "restorePoints", token, verify_ssl)
+    if rp_data:
+        restore_points = rp_data.get("data", []) if isinstance(rp_data, dict) else rp_data
+        print(f"\n  {Colors.BOLD}Restore Points ({len(restore_points)}):{Colors.END}")
+        # Count by malware status
+        malware_stats: Dict[str, int] = {}
+        for rp in restore_points:
+            status = rp.get("malwareStatus", "Unknown")
+            malware_stats[status] = malware_stats.get(status, 0) + 1
+        if malware_stats:
+            print("    Malware Status:")
+            for status, count in sorted(malware_stats.items(), key=lambda x: -x[1]):
+                print(f"      - {status}: {count}")
+
+    # =========================================================================
+    # TEST 8: Performance Test (Bulk vs Per-Object API Calls)
+    # =========================================================================
+    run_performance_test(
+        session, base_url, token, verify_ssl, timing, args.perf_objects
+    )
 
     # =========================================================================
     # SUMMARY AND RECOMMENDATIONS
@@ -752,7 +977,7 @@ Examples:
         recommendations.append("  - Check if Veeam REST API service is running")
 
     # Check API issues
-    api_results = [r for r in results.results if r[0] in ["API", "Infrastructure"]]
+    api_results = [r for r in results.results if r[0] in ["API", "Infrastructure", "Security"]]
     api_ok = all(r[2] == "PASS" for r in api_results)
 
     if api_ok:
@@ -770,6 +995,14 @@ Examples:
     else:
         issues_found = True
         recommendations.append("- License: Could not retrieve license information")
+
+    # Check timing
+    total_api_time = sum(t[1] for t in timing.timings)
+    if total_api_time > 30000:
+        issues_found = True
+        recommendations.append(f"- Performance: API calls take {total_api_time/1000:.1f}s - may cause timeouts")
+        recommendations.append("  - Consider enabling section caching in the special agent")
+        recommendations.append("  - Reduce session_age to limit historical data")
 
     # Final verdict
     print()
