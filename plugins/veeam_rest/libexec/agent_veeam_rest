@@ -33,6 +33,7 @@ logger = logging.getLogger("agent_veeam_rest")
 class CachePerSection:
     """Cache intervals per section in seconds. None = no caching."""
     jobs: int | None = 300              # 5 minutes
+    backup_objects: int | None = 300    # 5 minutes
     repositories: int | None = 1800     # 30 minutes
     proxies: int | None = 3600          # 1 hour
     managed_servers: int | None = 3600  # 1 hour
@@ -1166,44 +1167,55 @@ def main() -> int:
         # This avoids duplicate API calls for get_object_restore_points() (500+ calls per run)
         enriched_backup_objects: list[dict] | None = None
         if args.backup_mode or args.malware_mode:
-            try:
-                backup_objects = api.get_backup_objects_with_job_info(created_after)
+            # Check cache for enriched backup objects
+            cache_interval = cache_config.backup_objects
+            cached = load_cached_section(hostname_for_cache, "backup_objects", cache_interval) if cache_interval else None
 
-                # Fetch restore points in bulk with optional time filter
-                # This is the major performance optimization for large environments
-                all_restore_points: list[dict] | None = None
+            if cached:
+                enriched_backup_objects, _ = cached
+            else:
                 try:
-                    # Apply time filter if configured (default: 7 days)
-                    rp_created_after: str | None = None
-                    if args.restore_points_days > 0:
-                        rp_created_after = (
-                            datetime.now(timezone.utc) - timedelta(days=args.restore_points_days)
-                        ).strftime("%Y-%m-%dT%H:%M:%SZ")
-                        if args.debug:
-                            sys.stderr.write(f"Filtering restore points to last {args.restore_points_days} days\n")
+                    backup_objects = api.get_backup_objects_with_job_info(created_after)
 
-                    all_restore_points = api.get_all_restore_points(rp_created_after)
-                    if args.debug:
-                        sys.stderr.write(f"Fetched {len(all_restore_points)} restore points in bulk\n")
-                except VeeamAPIError as e:
-                    # Fall back to per-object calls if bulk fetch fails
-                    sys.stderr.write(f"Warning: Bulk restore points fetch failed, using per-object calls: {e}\n")
-
-                # Fetch tasks for enrichment (only available for VM backups)
-                tasks = None
-                if args.backup_mode:  # Only needed for backup services
+                    # Fetch restore points in bulk with optional time filter
+                    # This is the major performance optimization for large environments
+                    all_restore_points: list[dict] | None = None
                     try:
-                        tasks = api.get_task_sessions(created_after)
-                    except VeeamAPIError:
-                        pass  # Tasks not available, continue without
+                        # Apply time filter if configured (default: 7 days)
+                        rp_created_after: str | None = None
+                        if args.restore_points_days > 0:
+                            rp_created_after = (
+                                datetime.now(timezone.utc) - timedelta(days=args.restore_points_days)
+                            ).strftime("%Y-%m-%dT%H:%M:%SZ")
+                            if args.debug:
+                                sys.stderr.write(f"Filtering restore points to last {args.restore_points_days} days\n")
 
-                enriched_backup_objects = enrich_backup_objects(
-                    api, backup_objects, server_name, tasks, all_restore_points
-                )
-            except VeeamAPIError as e:
-                if args.debug:
-                    raise
-                sys.stderr.write(f"Failed to fetch backup objects: {e}\n")
+                        all_restore_points = api.get_all_restore_points(rp_created_after)
+                        if args.debug:
+                            sys.stderr.write(f"Fetched {len(all_restore_points)} restore points in bulk\n")
+                    except VeeamAPIError as e:
+                        # Fall back to per-object calls if bulk fetch fails
+                        sys.stderr.write(f"Warning: Bulk restore points fetch failed, using per-object calls: {e}\n")
+
+                    # Fetch tasks for enrichment (only available for VM backups)
+                    tasks = None
+                    if args.backup_mode:  # Only needed for backup services
+                        try:
+                            tasks = api.get_task_sessions(created_after)
+                        except VeeamAPIError:
+                            pass  # Tasks not available, continue without
+
+                    enriched_backup_objects = enrich_backup_objects(
+                        api, backup_objects, server_name, tasks, all_restore_points
+                    )
+
+                    # Cache the enriched result
+                    if cache_interval and enriched_backup_objects:
+                        store_cached_section(hostname_for_cache, "backup_objects", enriched_backup_objects)
+                except VeeamAPIError as e:
+                    if args.debug:
+                        raise
+                    sys.stderr.write(f"Failed to fetch backup objects: {e}\n")
 
         # Backup objects output based on --backup-mode
         if args.backup_mode and enriched_backup_objects is not None:

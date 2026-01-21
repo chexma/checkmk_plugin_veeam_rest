@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.45] - 2026-01-21
+
+### Added
+- **Caching for Backup Objects**: Added caching for `backup_objects` section (5 minutes default)
+  - Caches the enriched backup objects data (including restore points and task sessions)
+  - Reduces API load significantly in large environments
+  - Previously backup objects were fetched fresh on every agent run
+  - Cache can be disabled with `--no-cache` flag
+
 ## [0.0.44] - 2026-01-21
 
 ### Fixed
