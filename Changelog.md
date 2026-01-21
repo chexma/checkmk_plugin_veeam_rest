@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.40] - 2026-01-21
+
+### Changed
+- **Malware Events Service Output**: Moved detailed file location info to service details
+  - Summary now shows only: event type, severity, source, age
+  - Full details (file paths, detected patterns) visible in service details view
+  - Improves readability in service lists
+
 ## [0.0.39] - 2026-01-21
 
 ### Fixed
