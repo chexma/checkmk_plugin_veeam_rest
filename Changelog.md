@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.39] - 2026-01-21
+
+### Fixed
+- **Malware Events Detection**: Fixed machine name extraction using `displayName` instead of `name`
+  - API returns machine names in `displayName` field, not `name`
+  - Previously all events were grouped under "Unknown" instead of actual machine names
+- **Duplicate Section Output**: Fixed duplicate `<<<veeam_rest_malware_events>>>` section when both `malware_events` section and `malware_mode` are enabled
+  - Now only outputs enriched malware data when `malware_mode` is set
+  - Prevents parser conflicts from two sections with same name
+
 ## [0.0.38] - 2026-01-21
 
 ### Changed

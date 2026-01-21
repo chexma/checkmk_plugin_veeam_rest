@@ -759,7 +759,8 @@ def enrich_malware_events_with_backup_status(
     # Group events by machine name
     for event in malware_events:
         machine = event.get("machine", {})
-        machine_name = machine.get("name", "Unknown")
+        # API uses "displayName" for the machine name, not "name"
+        machine_name = machine.get("displayName") or machine.get("name", "Unknown")
         key = machine_name.lower()
         if key not in result:
             result[key] = {
@@ -1178,7 +1179,9 @@ def main() -> int:
             except VeeamAPIError as e:
                 sys.stderr.write(f"Warning: Failed to fetch wan_accelerators: {e}\n")
 
-        if "malware_events" in args.sections:
+        # Raw malware_events section - only output if NOT using malware_mode
+        # (malware_mode outputs enriched data with the same section name)
+        if "malware_events" in args.sections and not args.malware_mode:
             try:
                 cache_interval = cache_config.malware_events
                 cached = load_cached_section(hostname_for_cache, "malware_events", cache_interval) if cache_interval else None
