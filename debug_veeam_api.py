@@ -697,7 +697,7 @@ The password will be prompted securely (hidden input).
     parser.add_argument(
         "--redact",
         action="store_true",
-        help="Redact server names and hostnames in output for sharing logs",
+        help="Redact sensitive data (hostnames, credentials, job/repository names, license info)",
     )
     parser.add_argument(
         "--perf-objects",
@@ -793,6 +793,10 @@ The password will be prompted securely (hidden input).
     )
 
     if server_info:
+        # Add server name to redact list
+        server_name = server_info.get("name")
+        if REDACT_ENABLED and server_name and server_name not in REDACT_VALUES:
+            REDACT_VALUES.append(server_name)
         print(f"\n  {Colors.BOLD}Veeam Server Details:{Colors.END}")
         print(f"    Name: {redact(server_info.get('name', 'Unknown'))}")
         print(f"    Build: {server_info.get('buildVersion', 'Unknown')}")
@@ -812,6 +816,10 @@ The password will be prompted securely (hidden input).
     )
 
     if license_info:
+        # Add licensedTo to redact list
+        licensed_to = license_info.get("licensedTo")
+        if REDACT_ENABLED and licensed_to and licensed_to not in REDACT_VALUES:
+            REDACT_VALUES.append(licensed_to)
         print(f"\n  {Colors.BOLD}License Details:{Colors.END}")
         print(f"    Status: {license_info.get('status', 'Unknown')}")
         print(f"    Type: {license_info.get('type', 'Unknown')}")
@@ -889,6 +897,12 @@ The password will be prompted securely (hidden input).
     jobs_data, _ = api_get(session, base_url, "jobs/states", token, verify_ssl)
     if jobs_data:
         jobs = jobs_data.get("data", []) if isinstance(jobs_data, dict) else jobs_data
+        # Add job names to redact list
+        if REDACT_ENABLED:
+            for job in jobs:
+                job_name = job.get("name")
+                if job_name and job_name not in REDACT_VALUES:
+                    REDACT_VALUES.append(job_name)
         print(f"\n  {Colors.BOLD}Jobs ({len(jobs)}):{Colors.END}")
         for job in jobs[:10]:
             job_name = job.get("name", "Unknown")
@@ -903,6 +917,12 @@ The password will be prompted securely (hidden input).
     repos_data, _ = api_get(session, base_url, "backupInfrastructure/repositories/states", token, verify_ssl)
     if repos_data:
         repos = repos_data.get("data", []) if isinstance(repos_data, dict) else repos_data
+        # Add repository names to redact list
+        if REDACT_ENABLED:
+            for repo in repos:
+                repo_name = repo.get("name")
+                if repo_name and repo_name not in REDACT_VALUES:
+                    REDACT_VALUES.append(repo_name)
         print(f"\n  {Colors.BOLD}Repositories ({len(repos)}):{Colors.END}")
         for repo in repos[:10]:
             repo_name = repo.get("name", "Unknown")
