@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.37] - 2026-01-21
+
+### Changed
+- **Major Performance Fix**: Optimized `get_backup_objects_with_job_info()` function
+  - Now uses bulk endpoints instead of per-backup API calls
+  - **Before**: 35 API calls (1 + 34 per backup), ~34-340 seconds
+  - **After**: 2 API calls, ~1-2 seconds
+  - Uses `/api/v1/backupObjects` bulk endpoint + `/api/v1/backups` for job mapping
+  - Joins data in Python instead of making individual API calls per backup
+
 ## [0.0.36] - 2026-01-21
 
 ### Added

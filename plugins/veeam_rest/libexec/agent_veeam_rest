@@ -425,39 +425,44 @@ class VeeamRestAPI:
     def get_backup_objects_with_job_info(self) -> list[dict]:
         """Get all backup objects enriched with job name.
 
-        This fetches all backups first, then collects objects from each backup
-        with the job name (backup.name) added to each object.
+        Uses bulk endpoints and joins in Python for performance:
+        - 1 call to /api/v1/backupObjects (all objects)
+        - 1 call to /api/v1/backups (job name mapping)
+        Instead of 34+ individual calls per backup.
 
         Objects with no restore points are filtered out (typically VMs that
         were removed from the backup job but still have orphaned metadata).
         """
-        all_objects = []
+        # Fetch all backups to build backupId -> jobName mapping (1 API call)
         backups = self.get_backups()
+        backup_info = {
+            b.get("id"): {"jobName": b.get("name"), "jobType": b.get("jobType")}
+            for b in backups if b.get("id")
+        }
+        logger.debug("Built backup info mapping for %d backups", len(backup_info))
 
-        for backup in backups:
-            backup_id = backup.get("id")
-            job_name = backup.get("name")  # name is the job name
-            job_type = backup.get("jobType")
+        # Fetch all objects in bulk (1 API call instead of 34+)
+        all_objects = self.get_backup_objects()
+        logger.debug("Fetched %d backup objects in bulk", len(all_objects))
 
-            if not backup_id:
+        # Enrich objects with job info from backup mapping
+        result = []
+        for obj in all_objects:
+            # Skip objects without restore points (removed from job)
+            if obj.get("restorePointsCount", 0) == 0:
                 continue
 
-            try:
-                objects = self.get_backup_objects_for_backup(backup_id)
-                for obj in objects:
-                    # Skip objects without restore points (removed from job)
-                    if obj.get("restorePointsCount", 0) == 0:
-                        continue
+            # Add job info from backup mapping
+            backup_id = obj.get("backupId")
+            if backup_id and backup_id in backup_info:
+                obj["jobName"] = backup_info[backup_id]["jobName"]
+                if backup_info[backup_id]["jobType"]:
+                    obj["jobType"] = backup_info[backup_id]["jobType"]
 
-                    obj["jobName"] = job_name
-                    if job_type:
-                        obj["jobType"] = job_type
-                    all_objects.append(obj)
-            except VeeamAPIError:
-                # Skip if we can't fetch objects for this backup
-                pass
+            result.append(obj)
 
-        return all_objects
+        logger.info("Enriched %d backup objects with job info", len(result))
+        return result
 
     def get_object_restore_points(self, object_id: str) -> list[dict]:
         """Get restore points for a specific backup object."""
