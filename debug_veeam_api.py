@@ -460,6 +460,7 @@ def api_get_paginated(
     token: str,
     verify_ssl: bool,
     limit: int = 500,
+    extra_params: Optional[Dict[str, str]] = None,
 ) -> Tuple[List[dict], float, int]:
     """Get all items from a paginated endpoint. Returns (items, total_ms, call_count)."""
     all_items = []
@@ -475,6 +476,9 @@ def api_get_paginated(
 
     while True:
         url = f"{base_url}/api/v1/{endpoint}?limit={limit}&skip={skip}"
+        if extra_params:
+            for key, value in extra_params.items():
+                url += f"&{key}={value}"
         start = time.time()
         response = session.get(url, headers=headers, timeout=60, verify=verify_ssl)
         elapsed = (time.time() - start) * 1000
@@ -595,6 +599,7 @@ def run_performance_test(
     verify_ssl: bool,
     timing: TimingTracker,
     max_objects: int = 10,
+    restore_points_days: int = 7,
 ) -> None:
     """Run performance comparison between bulk and per-object API calls."""
     print_header("PERFORMANCE TEST: Bulk vs Per-Object API Calls")
@@ -612,14 +617,24 @@ def run_performance_test(
         print(warn("No backup objects found - skipping performance test"))
         return
 
-    # Test bulk restore points fetch
-    print_subheader("Bulk Restore Points (NEW - Optimized)")
+    # Test bulk restore points fetch with time filter
+    print_subheader(f"Bulk Restore Points (filtered to last {restore_points_days} days)")
+
+    # Calculate time filter
+    rp_params: Optional[Dict[str, str]] = None
+    if restore_points_days > 0:
+        from datetime import datetime, timedelta, timezone
+        created_after = (
+            datetime.now(timezone.utc) - timedelta(days=restore_points_days)
+        ).strftime("%Y-%m-%dT%H:%M:%SZ")
+        rp_params = {"createdAfterFilter": created_after}
+        print(f"  Filter: createdAfterFilter={created_after}")
 
     all_rp, bulk_time, bulk_calls = api_get_paginated(
-        session, base_url, "restorePoints", token, verify_ssl
+        session, base_url, "restorePoints", token, verify_ssl, extra_params=rp_params
     )
     print(f"  {ok(f'Fetched {len(all_rp)} restore points in {bulk_time:.0f}ms ({bulk_calls} calls)')}")
-    timing.add("restorePoints BULK (all)", bulk_time, bulk_calls)
+    timing.add(f"restorePoints BULK ({restore_points_days} days)", bulk_time, bulk_calls)
 
     # Test per-object restore points (limited to max_objects)
     print_subheader(f"Per-Object Restore Points (OLD - first {max_objects} objects)")
@@ -704,6 +719,12 @@ The password will be prompted securely (hidden input).
         type=int,
         default=10,
         help="Number of objects to test in per-object performance comparison (default: 10)",
+    )
+    parser.add_argument(
+        "--restore-points-days",
+        type=int,
+        default=7,
+        help="Only fetch restore points from the last N days (default: 7, 0=all)",
     )
 
     args = parser.parse_args()
@@ -966,7 +987,8 @@ The password will be prompted securely (hidden input).
     # TEST 8: Performance Test (Bulk vs Per-Object API Calls)
     # =========================================================================
     run_performance_test(
-        session, base_url, token, verify_ssl, timing, args.perf_objects
+        session, base_url, token, verify_ssl, timing,
+        args.perf_objects, args.restore_points_days
     )
 
     # =========================================================================
