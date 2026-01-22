@@ -884,11 +884,27 @@ The password will be prompted securely (hidden input).
         ("backupInfrastructure/managedServers", "Managed Servers"),
         ("backupInfrastructure/scaleOutRepositories", "Scale-Out Repositories"),
         ("backupInfrastructure/wanAccelerators", "WAN Accelerators"),
+        ("replicas", "Replicas"),
     ]
     for endpoint, name in infra_endpoints:
         data = test_api_endpoint(
             session, base_url, endpoint, token, name,
             results, "Infrastructure", verify_ssl, timing
+        )
+        if data and isinstance(data, dict) and "data" in data:
+            print(f"    Found: {len(data['data'])} items")
+        elif data and isinstance(data, list):
+            print(f"    Found: {len(data)} items")
+
+    print_subheader("Configuration & Security Endpoints")
+    config_endpoints = [
+        ("configBackup", "Configuration Backup"),
+        ("securityAnalyzer/bestPractices", "Security Best Practices"),
+    ]
+    for endpoint, name in config_endpoints:
+        data = test_api_endpoint(
+            session, base_url, endpoint, token, name,
+            results, "Config/Security", verify_ssl, timing, show_data=True
         )
         if data and isinstance(data, dict) and "data" in data:
             print(f"    Found: {len(data['data'])} items")
@@ -1041,7 +1057,69 @@ The password will be prompted securely (hidden input).
             print(info("No VMs with Warning/Failed task results found in warning sessions"))
 
     # =========================================================================
-    # TEST 9: Performance Test (Bulk vs Per-Object API Calls)
+    # TEST 9: Configuration & Security Status
+    # =========================================================================
+    print_header("9. CONFIGURATION & SECURITY STATUS")
+
+    # Configuration Backup
+    print_subheader("Configuration Backup")
+    config_backup_data, _ = api_get(session, base_url, "configBackup", token, verify_ssl)
+    if config_backup_data:
+        is_enabled = config_backup_data.get("isEnabled", False)
+        if is_enabled:
+            print(f"  {ok('Configuration backup is ENABLED')}")
+        else:
+            print(f"  {fail('Configuration backup is DISABLED')}")
+
+        last_backup = config_backup_data.get("lastSuccessfulBackup", {})
+        last_time = last_backup.get("lastSuccessfulTime")
+        if last_time:
+            print(f"    Last successful backup: {last_time}")
+        else:
+            print(f"    {warn('No successful backup recorded')}")
+
+        encryption = config_backup_data.get("encryption", {})
+        enc_enabled = encryption.get("isEnabled", False)
+        print(f"    Encryption: {'Enabled' if enc_enabled else 'Disabled'}")
+
+        restore_points = config_backup_data.get("restorePointsToKeep", 0)
+        print(f"    Restore points to keep: {restore_points}")
+    else:
+        print(warn("Could not retrieve configuration backup status"))
+
+    # Security Best Practices
+    print_subheader("Security Best Practices")
+    security_data, sec_time = api_get(session, base_url, "securityAnalyzer/bestPractices", token, verify_ssl)
+    if security_data:
+        checks = security_data.get("data", []) if isinstance(security_data, dict) else security_data
+        if isinstance(checks, list):
+            passed = sum(1 for c in checks if c.get("status") == "Passed")
+            failed = sum(1 for c in checks if c.get("status") == "Failed")
+            suppressed = sum(1 for c in checks if c.get("status") == "Suppressed")
+            not_applicable = sum(1 for c in checks if c.get("status") == "NotApplicable")
+
+            total = passed + failed + suppressed + not_applicable
+            print(f"  Total checks: {total}")
+            print(f"    {Colors.GREEN}Passed: {passed}{Colors.END}")
+            if failed > 0:
+                print(f"    {Colors.RED}Failed: {failed}{Colors.END}")
+            else:
+                print(f"    Failed: {failed}")
+            print(f"    Suppressed: {suppressed}")
+            print(f"    Not Applicable: {not_applicable}")
+
+            # Show failed checks
+            if failed > 0:
+                print(f"\n  {Colors.BOLD}Failed Checks:{Colors.END}")
+                for check in checks:
+                    if check.get("status") == "Failed":
+                        name = check.get("name", "Unknown")
+                        print(f"    {Colors.RED}✗{Colors.END} {name}")
+    else:
+        print(warn("Could not retrieve security best practices"))
+
+    # =========================================================================
+    # TEST 10: Performance Test (Bulk vs Per-Object API Calls)
     # =========================================================================
     run_performance_test(
         session, base_url, token, verify_ssl, timing,
