@@ -36,16 +36,18 @@ See [Installation Guide](installation.md) for detailed setup instructions includ
 
 ## Sections
 
-| Section | Default | Description |
-|---------|---------|-------------|
-| jobs | Yes | Backup job states |
-| repositories | Yes | Repository capacity |
-| proxies | Yes | Proxy status |
-| managed_servers | No | Managed infrastructure |
-| license | No | License information |
-| server | No | Backup server info |
-| scaleout_repositories | No | Scale-out repositories |
-| wan_accelerators | No | WAN accelerators |
+All sections are enabled by default (v0.0.54+):
+
+| Section | Description |
+|---------|-------------|
+| jobs | Backup job states |
+| repositories | Repository capacity |
+| proxies | Proxy status |
+| managed_servers | Managed infrastructure (vCenter, ESXi, Hyper-V) |
+| license | License information |
+| server | Backup server info |
+| scaleout_repositories | Scale-out repositories |
+| wan_accelerators | WAN accelerators |
 
 ## Rulesets
 
