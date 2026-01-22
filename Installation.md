@@ -60,18 +60,46 @@ The REST API is enabled by default in Veeam B&R 13+. Verify it's running:
 2. Go to **Menu > Options > RESTful API**
 3. Ensure the service is enabled on port 9419
 
-### Create a Monitoring User
+### Create a Monitoring User (Security Best Practices)
 
-For security, create a dedicated, local Windows user for monitoring.
+Following the **principle of least privilege**, create a dedicated user account exclusively for Veeam monitoring:
+
+1. **Create a local Windows user** on the Veeam server (not a domain admin!)
+   - Use a descriptive name like `svc_checkmk_veeam` or `veeam_monitor`
+   - Use a strong, unique password
+   - Disable interactive logon if possible
+
+2. **Do NOT use:**
+   - Domain Administrator accounts
+   - The Veeam service account
+   - Shared accounts used for other purposes
+   - Personal user accounts
 
 ### Assign Veeam Permissions
 
 1. Open **Veeam Backup & Replication Console**
 2. Go to **Menu > Users and Roles**
 3. Click **Add** and select your monitoring user
-4. Assign the **Veeam Backup Viewer** role (read-only)
+4. Assign the **Veeam Backup Viewer** role
 
-> **Note:** The Viewer role cannot access license information. Use **Veeam Backup Administrator** if you need license monitoring.
+**Available Roles:**
+
+| Role | Access Level | Recommendation |
+|------|--------------|----------------|
+| **Veeam Backup Viewer** | Read-only access to jobs, repositories, proxies | Recommended for monitoring |
+| **Veeam Backup Operator** | Viewer + can start/stop jobs | Not needed for monitoring |
+| **Veeam Backup Administrator** | Full access including license info | Only if license monitoring required |
+
+### Role Limitations
+
+The **Veeam Backup Viewer** role is the most secure choice but has limitations:
+
+- Cannot access license information (license section will be empty)
+- Cannot view some advanced configuration details
+
+If you need license monitoring, you must use the **Veeam Backup Administrator** role.
+
+> **Note:** The Veeam REST API currently lacks granular RBAC. You cannot create a custom role with "Viewer + License" permissions. See [Veeam Forums](https://forums.veeam.com/post561632.html#p561632) for discussion.
 
 ## Step 4: Add the Veeam Host to Checkmk
 
@@ -143,18 +171,6 @@ Check that services are discovered:
 | Veeam Proxy veeam-proxy01 | OK |
 | Veeam License | OK |
 
-Test the special agent manually (optional):
-
-```bash
-# As site user
-/omd/sites/<sitename>/local/lib/python3/cmk_addons/plugins/veeam_rest/libexec/agent_veeam_rest \
-    --hostname veeam-server.local \
-    --username 'DOMAIN\veeam_monitor' \
-    --password 'SecurePassword123!' \
-    --no-cert-check \
-    --debug
-```
-
 ## Troubleshooting
 
 ### "Connection refused" or timeout
@@ -211,8 +227,6 @@ This single filter controls the age of both **task sessions** AND **restore poin
 **Impact on monitoring:**
 - Task sessions provide backup metrics (size, duration, speed) for piggyback services
 - Restore points provide malware scan status and latest backup time
-- Does NOT affect Job services (they use the jobs API)
-- Does NOT affect restore point count metrics (from backupObjects API)
 
 **Recommended values - set based on your backup frequency:**
 
@@ -269,41 +283,3 @@ Configure via GUI under "Cache Intervals per Section" in the special agent rule.
 Enable "Disable Caching" option for always-fresh data (increases API load significantly).
 
 ---
-
-### Performance Summary
-
-Optimal configuration for most environments:
-
-| Setting | Value | Agent Runtime |
-|---------|-------|---------------|
-| Fetch Data From Last | 24 hours | ~4s (tasks + restore points) |
-| Caching enabled | Yes (default) | Cache hit: ~0.5s |
-| **Total (worst case)** | | **~8s** |
-| **Total (typical)** | | **~0.5s** |
-
-## Upgrading
-
-To upgrade to a new version:
-
-```bash
-# Download new version
-mkp add veeam_rest-X.Y.Z.mkp
-
-# Disable old version, enable new
-mkp disable veeam_rest 0.0.35
-mkp enable veeam_rest X.Y.Z
-
-# Restart services
-omd restart apache
-cmk -R
-```
-
-## Uninstalling
-
-```bash
-mkp disable veeam_rest 0.0.35
-mkp remove veeam_rest 0.0.35
-omd restart apache
-```
-
-Don't forget to remove the special agent rule and re-discover services on affected hosts.
