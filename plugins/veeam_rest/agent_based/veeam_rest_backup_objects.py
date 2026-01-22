@@ -148,8 +148,32 @@ def check_veeam_rest_backup_objects(
         if warning_job:
             yield Result(state=State.OK, notice=f"{severity} from job: {warning_job}")
 
-    # Restore points count as metric
+    # Restore points count with optional min/max thresholds
     yield Metric("veeam_rest_backup_restore_points", restore_point_count)
+
+    # Check minimum restore points
+    min_warn = params.get("restore_points_min_warn")
+    min_crit = params.get("restore_points_min_crit")
+    if min_warn is not None or min_crit is not None:
+        yield from check_levels(
+            restore_point_count,
+            levels_lower=(min_warn, min_crit) if min_warn is not None and min_crit is not None else None,
+            render_func=lambda x: str(int(x)),
+            label="Restore points",
+            notice_only=True,
+        )
+
+    # Check maximum restore points
+    max_warn = params.get("restore_points_max_warn")
+    max_crit = params.get("restore_points_max_crit")
+    if max_warn is not None or max_crit is not None:
+        yield from check_levels(
+            restore_point_count,
+            levels_upper=(max_warn, max_crit) if max_warn is not None and max_crit is not None else None,
+            render_func=lambda x: str(int(x)),
+            label="Restore points",
+            notice_only=True,
+        )
 
     # Backup age from enrichment
     backup_age = obj.get("backupAgeSeconds")

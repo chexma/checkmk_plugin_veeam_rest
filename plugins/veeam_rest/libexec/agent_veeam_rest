@@ -829,8 +829,8 @@ def output_piggyback_backup_objects(objects: list[dict], redactor: VeeamRedactor
         if not hostname:
             continue
 
-        # Normalize hostname for Checkmk (lowercase, no special chars)
-        piggyback_hostname = hostname.lower().replace(" ", "_")
+        # Normalize hostname for Checkmk (spaces to underscores only)
+        piggyback_hostname = hostname.replace(" ", "_")
 
         if redactor:
             obj = redactor.redact_dict(obj)
@@ -925,7 +925,7 @@ def output_piggyback_malware_combined(
     """Output combined malware data as piggyback sections per machine."""
     for key, data in malware_data.items():
         machine_name = data.get("machineName", key)
-        piggyback_hostname = machine_name.lower().replace(" ", "_")
+        piggyback_hostname = machine_name.replace(" ", "_")
 
         if redactor:
             data = redactor.redact_dict(data)

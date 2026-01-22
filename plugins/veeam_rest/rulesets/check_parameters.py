@@ -599,6 +599,45 @@ def _veeam_rest_backup_form() -> Dictionary:
                     prefill=DefaultValue(72),
                 ),
             ),
+            "restore_points_min_warn": DictElement(
+                required=False,
+                parameter_form=Integer(
+                    title=Title("Minimum restore points (warning)"),
+                    help_text=Help(
+                        "Alert with WARNING if the number of restore points is below this threshold."
+                    ),
+                    prefill=DefaultValue(1),
+                ),
+            ),
+            "restore_points_min_crit": DictElement(
+                required=False,
+                parameter_form=Integer(
+                    title=Title("Minimum restore points (critical)"),
+                    help_text=Help(
+                        "Alert with CRITICAL if the number of restore points is below this threshold."
+                    ),
+                    prefill=DefaultValue(0),
+                ),
+            ),
+            "restore_points_max_warn": DictElement(
+                required=False,
+                parameter_form=Integer(
+                    title=Title("Maximum restore points (warning)"),
+                    help_text=Help(
+                        "Alert with WARNING if the number of restore points exceeds this threshold. "
+                        "Useful to detect backup retention issues."
+                    ),
+                ),
+            ),
+            "restore_points_max_crit": DictElement(
+                required=False,
+                parameter_form=Integer(
+                    title=Title("Maximum restore points (critical)"),
+                    help_text=Help(
+                        "Alert with CRITICAL if the number of restore points exceeds this threshold."
+                    ),
+                ),
+            ),
         },
     )
 

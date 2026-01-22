@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.46] - 2026-01-21
+
+### Added
+- **Restore Points Thresholds**: New parameters for Veeam Backup services
+  - `restore_points_min_warn` / `restore_points_min_crit`: Alert if restore points below threshold
+  - `restore_points_max_warn` / `restore_points_max_crit`: Alert if restore points exceed threshold
+  - Useful for detecting backup retention issues or missing backups
+  - Applies to both piggyback and server-side backup services
+- **Restore Points Metric**: Added `veeam_rest_backup_restore_points` metric to piggyback services
+
 ## [0.0.45] - 2026-01-21
 
 ### Added
