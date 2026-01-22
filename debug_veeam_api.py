@@ -13,8 +13,7 @@ Tests performed:
 4. REST API endpoints (jobs, repositories, proxies, etc.)
 5. License and server information
 6. Backup objects and restore points
-7. Malware detection events
-8. Performance comparison (bulk vs per-object API calls)
+7. Performance comparison (bulk vs per-object API calls)
 
 Additionally shows timing summary for all API calls to help identify
 performance bottlenecks.
@@ -896,20 +895,6 @@ The password will be prompted securely (hidden input).
         elif data and isinstance(data, list):
             print(f"    Found: {len(data)} items")
 
-    print_subheader("Security Endpoints")
-    security_endpoints = [
-        ("malwareDetection/events", "Malware Events"),
-    ]
-    for endpoint, name in security_endpoints:
-        data = test_api_endpoint(
-            session, base_url, endpoint, token, name,
-            results, "Security", verify_ssl, timing
-        )
-        if data and isinstance(data, dict) and "data" in data:
-            print(f"    Found: {len(data['data'])} items")
-        elif data and isinstance(data, list):
-            print(f"    Found: {len(data)} items")
-
     # =========================================================================
     # TEST 7: Data Summary
     # =========================================================================
@@ -1103,7 +1088,7 @@ The password will be prompted securely (hidden input).
         recommendations.append("  - Check if Veeam REST API service is running")
 
     # Check API issues
-    api_results = [r for r in results.results if r[0] in ["API", "Infrastructure", "Security"]]
+    api_results = [r for r in results.results if r[0] in ["API", "Infrastructure"]]
     api_ok = all(r[2] == "PASS" for r in api_results)
 
     if api_ok:

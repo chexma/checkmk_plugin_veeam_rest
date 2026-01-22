@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.48] - 2026-01-22
+
+### Changed
+- **Malware Status Simplification**: Replaced separate malware events with integrated backup malware status
+  - Malware status now shown directly in Veeam Backup services: `Malware scan: Clean`
+  - Status comes from `latestRestorePoint.malwareStatus` field (no extra API call)
+  - Configurable state mapping via new `malware_status_states` parameter in Veeam Backup ruleset
+  - Defaults: Clean=OK, Infected=CRIT, Suspicious=WARN, NotScanned=WARN
+
+### Removed
+- **Malware Events Plugin**: Removed `veeam_rest_malware_events.py` check plugin
+- **Malware Events API**: Removed `/api/v1/malwareDetection/events` API calls from agent
+- **--malware-mode Option**: Removed from special agent (no longer needed)
+- **Malware Events Section**: Removed `malware_events` and `malware_combined` cache sections
+- **Debug Script**: Removed malware events endpoint test
+
+### Added
+- **Last Run/Next Run in Jobs**: Added formatted dates to job service details
+  - Format: DD.MM.YYYY HH:MM:SS (e.g., "22.01.2026 14:30:00")
+  - Shown in service details for scheduled jobs
+
 ## [0.0.47] - 2026-01-22
 
 ### Fixed

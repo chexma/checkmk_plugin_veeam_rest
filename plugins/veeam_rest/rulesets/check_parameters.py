@@ -638,6 +638,7 @@ def _veeam_rest_backup_form() -> Dictionary:
                     ),
                 ),
             ),
+            **_malware_status_elements(),
         },
     )
 
@@ -648,30 +649,4 @@ rule_spec_veeam_rest_backup = CheckParameters(
     topic=Topic.APPLICATIONS,
     parameter_form=_veeam_rest_backup_form,
     condition=HostAndItemCondition(item_title=Title("Object name")),
-)
-
-
-# =============================================================================
-# VEEAM MALWARE EVENTS
-# =============================================================================
-
-def _veeam_rest_malware_events_form() -> Dictionary:
-    return Dictionary(
-        title=Title("Veeam Malware Events Parameters"),
-        help_text=Help(
-            "Configure parameters for Veeam Malware event monitoring. "
-            "This includes both malware detection events and the backup scan status."
-        ),
-        elements={
-            **_malware_status_elements(),
-        },
-    )
-
-
-rule_spec_veeam_rest_malware_events = CheckParameters(
-    name="veeam_rest_malware_events",
-    title=Title("Veeam Malware Events"),
-    topic=Topic.APPLICATIONS,
-    parameter_form=_veeam_rest_malware_events_form,
-    condition=HostAndItemCondition(item_title=Title("Machine name")),
 )

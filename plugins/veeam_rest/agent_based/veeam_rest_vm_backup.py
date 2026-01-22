@@ -224,6 +224,26 @@ def check_veeam_rest_vm_backup(
     # Latest restore point details (fallback for size if no task data)
     latest_rp = section.get("latestRestorePoint")
     if latest_rp:
+        # Malware status from backup scan
+        malware_status = latest_rp.get("malwareStatus")
+        if malware_status:
+            # Get configured state mapping (defaults: Clean=OK, Infected=CRIT, Suspicious=WARN, NotScanned=WARN)
+            malware_states = params.get("malware_status_states", {})
+            default_mapping = {
+                "Clean": State.OK,
+                "Infected": State.CRIT,
+                "Suspicious": State.WARN,
+                "NotScanned": State.WARN,
+            }
+            state_str_map = {"ok": State.OK, "warn": State.WARN, "crit": State.CRIT}
+            # Apply user-configured overrides
+            for status, state_str in malware_states.items():
+                if state_str in state_str_map:
+                    default_mapping[status] = state_str_map[state_str]
+
+            status_state = default_mapping.get(malware_status, State.OK)
+            yield Result(state=status_state, summary=f"Malware scan: {malware_status}")
+
         # Size from restore point (only if no task data provided processedSize)
         if not task_data or not (task_data.get("progress") or {}).get("processedSize"):
             original_size = latest_rp.get("originalSize")
@@ -247,6 +267,8 @@ check_plugin_veeam_rest_vm_backup = CheckPlugin(
     service_name="Veeam Backup %s",
     discovery_function=discover_veeam_rest_vm_backup,
     check_function=check_veeam_rest_vm_backup,
-    check_default_parameters={},
+    check_default_parameters={
+        "malware_status_states": {},  # Use defaults: Clean=OK, Infected=CRIT, Suspicious=WARN, NotScanned=WARN
+    },
     check_ruleset_name="veeam_rest_backup",
 )

@@ -41,8 +41,6 @@ class CachePerSection:
     server: int | None = 86400          # 24 hours
     scaleout_repositories: int | None = 1800  # 30 minutes
     wan_accelerators: int | None = 3600  # 1 hour
-    malware_events: int | None = 300    # 5 minutes
-    malware_combined: int | None = 300  # 5 minutes (for --malware-mode)
 
 
 def get_cache_dir() -> Path:
@@ -594,17 +592,6 @@ class VeeamRestAPI:
             params["createdAfterFilter"] = created_after
         return self._get_paginated("/api/v1/restorePoints", params)
 
-    def get_malware_events(self, created_after: str | None = None) -> list[dict]:
-        """Get malware detection events.
-
-        Returns events with details about suspicious activity detection,
-        including events marked as false positive (confirmed clean).
-        """
-        params = {}
-        if created_after:
-            params["createdAfterTimeUtcFilter"] = created_after
-        return self._get_paginated("/api/v1/malwareDetection/events", params)
-
     def get_session_logs(self, session_id: str, status_filter: str | None = None) -> list[dict]:
         """Get logs for a session, optionally filtered by status.
 
@@ -856,88 +843,6 @@ def output_backup_objects_section(objects: list[dict], redactor: VeeamRedactor |
     print(json.dumps(objects))
 
 
-def enrich_malware_events_with_backup_status(
-    malware_events: list[dict],
-    backup_objects: list[dict],
-) -> dict[str, dict]:
-    """Combine malware events with backup object malware status.
-
-    Returns dict by hostname with:
-    - machineName: Original machine name
-    - events: list of malware events
-    - malwareStatus: from latest restore point (if available)
-    - restorePointsCount: number of restore points
-    - lastBackup: creation time of latest restore point
-    """
-    result: dict[str, dict] = {}
-
-    # Build lookup by hostname from backup objects (lowercase for matching)
-    backup_by_name: dict[str, dict] = {}
-    for obj in backup_objects:
-        name = obj.get("name", "").lower()
-        if name:
-            backup_by_name[name] = obj
-
-    # Group events by machine name
-    for event in malware_events:
-        machine = event.get("machine", {})
-        # API uses "displayName" for the machine name, not "name"
-        machine_name = machine.get("displayName") or machine.get("name", "Unknown")
-        key = machine_name.lower()
-        if key not in result:
-            result[key] = {
-                "machineName": machine_name,
-                "events": [],
-                "malwareStatus": None,
-                "restorePointsCount": 0,
-                "lastBackup": None,
-            }
-        result[key]["events"].append(event)
-
-    # Enrich with backup object data
-    for key, data in result.items():
-        if key in backup_by_name:
-            obj = backup_by_name[key]
-            latest_rp = obj.get("latestRestorePoint", {})
-            data["malwareStatus"] = latest_rp.get("malwareStatus")
-            data["restorePointsCount"] = obj.get("restorePointsCount", 0)
-            data["lastBackup"] = latest_rp.get("creationTime")
-
-    return result
-
-
-def output_malware_combined(
-    malware_data: dict[str, dict],
-    redactor: VeeamRedactor | None = None,
-) -> None:
-    """Output combined malware data as server-side section.
-
-    Outputs all machines with malware events in a single section.
-    """
-    if redactor:
-        malware_data = {k: redactor.redact_dict(v) for k, v in malware_data.items()}
-    print("<<<veeam_rest_malware_events:sep(0)>>>")
-    print(json.dumps(malware_data))
-
-
-def output_piggyback_malware_combined(
-    malware_data: dict[str, dict],
-    redactor: VeeamRedactor | None = None,
-) -> None:
-    """Output combined malware data as piggyback sections per machine."""
-    for key, data in malware_data.items():
-        machine_name = data.get("machineName", key)
-        piggyback_hostname = machine_name.replace(" ", "_")
-
-        if redactor:
-            data = redactor.redact_dict(data)
-
-        print(f"<<<<{piggyback_hostname}>>>>")
-        print("<<<veeam_rest_malware_events:sep(0)>>>")
-        print(json.dumps(data))
-        print("<<<<>>>>")
-
-
 # =============================================================================
 # MAIN
 # =============================================================================
@@ -991,12 +896,6 @@ def parse_arguments() -> argparse.Namespace:
         choices=["piggyback-vms", "backup-server"],
         default=None,
         help="Backup service output mode: piggyback-vms (to VMs), backup-server (direct on server)"
-    )
-    parser.add_argument(
-        "--malware-mode",
-        choices=["piggyback-hosts", "backup-server"],
-        default=None,
-        help="Malware service output mode: piggyback-hosts (to affected hosts), backup-server (direct on server)"
     )
     parser.add_argument(
         "--session-age",
@@ -1165,10 +1064,10 @@ def main() -> int:
             except VeeamAPIError as e:
                 sys.stderr.write(f"Warning: Failed to fetch jobs: {e}\n")
 
-        # Fetch and enrich backup objects once if needed by backup_mode or malware_mode
+        # Fetch and enrich backup objects if backup_mode is enabled
         # This avoids duplicate API calls for get_object_restore_points() (500+ calls per run)
         enriched_backup_objects: list[dict] | None = None
-        if args.backup_mode or args.malware_mode:
+        if args.backup_mode:
             # Check cache for enriched backup objects
             cache_interval = cache_config.backup_objects
             cached = load_cached_section(hostname_for_cache, "backup_objects", cache_interval) if cache_interval else None
@@ -1311,51 +1210,6 @@ def main() -> int:
                     output_section("wan_accelerators", wan_accelerators, redactor, timestamp, cache_interval)
             except VeeamAPIError as e:
                 sys.stderr.write(f"Warning: Failed to fetch wan_accelerators: {e}\n")
-
-        # Raw malware_events section - only output if NOT using malware_mode
-        # (malware_mode outputs enriched data with the same section name)
-        if "malware_events" in args.sections and not args.malware_mode:
-            try:
-                cache_interval = cache_config.malware_events
-                cached = load_cached_section(hostname_for_cache, "malware_events", cache_interval) if cache_interval else None
-                if cached:
-                    malware_events, timestamp = cached
-                    output_section("malware_events", malware_events, redactor, timestamp, cache_interval)
-                else:
-                    malware_events = api.get_malware_events(created_after)
-                    timestamp = store_cached_section(hostname_for_cache, "malware_events", malware_events) if cache_interval else None
-                    output_section("malware_events", malware_events, redactor, timestamp, cache_interval)
-            except VeeamAPIError as e:
-                sys.stderr.write(f"Warning: Failed to fetch malware_events: {e}\n")
-
-        # Malware events output based on --malware-mode (combined with backup status)
-        if args.malware_mode:
-            try:
-                cache_interval = cache_config.malware_combined
-                cached = load_cached_section(hostname_for_cache, "malware_combined", cache_interval) if cache_interval else None
-
-                if cached:
-                    malware_combined, _ = cached
-                else:
-                    malware_events = api.get_malware_events(created_after)
-
-                    # Reuse enriched backup objects (already fetched above if backup_mode or malware_mode)
-                    # This avoids duplicate API calls for restore points
-                    malware_combined = enrich_malware_events_with_backup_status(
-                        malware_events, enriched_backup_objects or []
-                    )
-                    store_cached_section(hostname_for_cache, "malware_combined", malware_combined) if cache_interval else None
-
-                if args.malware_mode == "piggyback-hosts":
-                    # Piggyback to affected hosts
-                    output_piggyback_malware_combined(malware_combined, redactor)
-                elif args.malware_mode == "backup-server":
-                    # Direct services on Veeam server
-                    output_malware_combined(malware_combined, redactor)
-            except VeeamAPIError as e:
-                if args.debug:
-                    raise
-                sys.stderr.write(f"Failed to fetch malware events: {e}\n")
 
     except VeeamAPIError as e:
         # Authentication or critical API error
