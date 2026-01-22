@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.53] - 2026-01-22
+
+### Changed
+- **Major Code Refactoring**: Consolidated duplicate code across check plugins
+  - Parse functions: Added shared `parse_json_section()` to lib.py, used by all 6 check plugins
+  - Backup logic: Added `yield_backup_metrics()` to lib.py with ~160 lines of shared check logic
+  - Added `get_malware_state()` helper for malware status mapping
+  - **Code reduction**: ~320 lines of duplicate code eliminated
+
+### Performance
+- **O(1) Item Lookup**: All check plugins now use dict-based sections instead of list iteration
+  - Parse functions convert JSON lists to dicts keyed by item name
+  - Check functions use direct dict lookup instead of O(n) loops
+  - Improves performance for environments with many items
+
+### Files Changed
+- `lib.py`: +`parse_json_section()`, +`get_malware_state()`, +`yield_backup_metrics()`
+- `veeam_rest_backup_objects.py`: 302 → 137 lines (55% reduction)
+- `veeam_rest_vm_backup.py`: 275 → 116 lines (58% reduction)
+- All 6 other check plugins: Dict-based sections with O(1) lookup
+
 ## [0.0.52] - 2026-01-22
 
 ### Fixed

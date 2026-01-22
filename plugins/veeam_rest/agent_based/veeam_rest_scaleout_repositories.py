@@ -5,7 +5,6 @@ Check plugin for Veeam Scale-Out Backup Repositories.
 Monitors scale-out repository status and extent health.
 """
 
-import json
 from collections.abc import Mapping
 from typing import Any
 
@@ -17,27 +16,24 @@ from cmk.agent_based.v2 import (
     Result,
     Service,
     State,
-    StringTable,
 )
+
+from cmk_addons.plugins.veeam_rest.lib import parse_json_section
 
 
 # =============================================================================
 # SECTION PARSING
 # =============================================================================
 
-Section = list[dict[str, Any]]
+Section = dict[str, dict[str, Any]]  # name -> repository data
 
 
-def parse_veeam_rest_scaleout_repositories(string_table: StringTable) -> Section | None:
-    """Parse JSON output from special agent."""
-    if not string_table:
+def parse_veeam_rest_scaleout_repositories(string_table) -> Section | None:
+    """Parse JSON list of scale-out repositories into dict by name for O(1) lookup."""
+    data = parse_json_section(string_table)
+    if not data or not isinstance(data, list):
         return None
-
-    try:
-        json_str = "".join(line[0] for line in string_table)
-        return json.loads(json_str)
-    except (json.JSONDecodeError, IndexError):
-        return None
+    return {r.get("name"): r for r in data if r.get("name")} or None
 
 
 agent_section_veeam_rest_scaleout_repositories = AgentSection(
@@ -55,10 +51,8 @@ def discover_veeam_rest_scaleout_repositories(section: Section) -> DiscoveryResu
     if not section:
         return
 
-    for repo in section:
-        repo_name = repo.get("name")
-        if repo_name:
-            yield Service(item=repo_name)
+    for name in section:
+        yield Service(item=name)
 
 
 # =============================================================================
@@ -87,13 +81,8 @@ def check_veeam_rest_scaleout_repositories(
         yield Result(state=State.UNKNOWN, summary="No data received from agent")
         return
 
-    # Find the repository by name
-    repo = None
-    for r in section:
-        if r.get("name") == item:
-            repo = r
-            break
-
+    # O(1) lookup by name
+    repo = section.get(item)
     if repo is None:
         yield Result(state=State.UNKNOWN, summary="Repository not found")
         return

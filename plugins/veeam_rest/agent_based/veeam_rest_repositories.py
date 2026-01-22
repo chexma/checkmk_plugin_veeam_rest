@@ -5,7 +5,6 @@ Check plugin for Veeam Backup Repositories.
 Monitors repository capacity, usage, and online status.
 """
 
-import json
 from collections.abc import Mapping
 from typing import Any
 
@@ -18,29 +17,40 @@ from cmk.agent_based.v2 import (
     Result,
     Service,
     State,
-    StringTable,
     check_levels,
     render,
 )
+
+from cmk_addons.plugins.veeam_rest.lib import parse_json_section
 
 
 # =============================================================================
 # SECTION PARSING
 # =============================================================================
 
-Section = list[dict[str, Any]]
+Section = dict[str, dict[str, Any]]  # "Category - Name" -> repository data
 
 
-def parse_veeam_rest_repositories(string_table: StringTable) -> Section | None:
-    """Parse JSON output from special agent."""
-    if not string_table:
+def _get_repo_item(repo: dict[str, Any]) -> str | None:
+    """Get the service item name for a repository."""
+    name = repo.get("name")
+    if not name:
         return None
+    category = _get_repo_category(repo)
+    return f"{category} - {name}"
 
-    try:
-        json_str = "".join(line[0] for line in string_table)
-        return json.loads(json_str)
-    except (json.JSONDecodeError, IndexError):
+
+def parse_veeam_rest_repositories(string_table) -> Section | None:
+    """Parse JSON list of repositories into dict by 'Category - Name' for O(1) lookup."""
+    data = parse_json_section(string_table)
+    if not data or not isinstance(data, list):
         return None
+    result = {}
+    for repo in data:
+        item = _get_repo_item(repo)
+        if item:
+            result[item] = repo
+    return result or None
 
 
 agent_section_veeam_rest_repositories = AgentSection(
@@ -117,13 +127,8 @@ def discover_veeam_rest_repositories(section: Section) -> DiscoveryResult:
     if not section:
         return
 
-    for repo in section:
-        repo_name = repo.get("name")
-        if repo_name:
-            # Include category in item for service name differentiation
-            category = _get_repo_category(repo)
-            item = f"{category} - {repo_name}"
-            yield Service(item=item)
+    for item in section:
+        yield Service(item=item)
 
 
 # =============================================================================
@@ -140,17 +145,8 @@ def check_veeam_rest_repositories(
         yield Result(state=State.UNKNOWN, summary="No data received from agent")
         return
 
-    # Find the repository by matching the item format "Category - Name"
-    repo = None
-    for r in section:
-        repo_name = r.get("name")
-        if repo_name:
-            category = _get_repo_category(r)
-            expected_item = f"{category} - {repo_name}"
-            if expected_item == item:
-                repo = r
-                break
-
+    # O(1) lookup by "Category - Name"
+    repo = section.get(item)
     if repo is None:
         yield Result(state=State.UNKNOWN, summary="Repository not found")
         return

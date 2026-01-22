@@ -5,7 +5,6 @@ Check plugin for Veeam Managed Servers.
 Monitors managed server status (vCenter, ESXi, Hyper-V hosts, etc.).
 """
 
-import json
 from collections.abc import Mapping
 from typing import Any
 
@@ -17,27 +16,24 @@ from cmk.agent_based.v2 import (
     Result,
     Service,
     State,
-    StringTable,
 )
+
+from cmk_addons.plugins.veeam_rest.lib import parse_json_section
 
 
 # =============================================================================
 # SECTION PARSING
 # =============================================================================
 
-Section = list[dict[str, Any]]
+Section = dict[str, dict[str, Any]]  # name -> server data
 
 
-def parse_veeam_rest_managed_servers(string_table: StringTable) -> Section | None:
-    """Parse JSON output from special agent."""
-    if not string_table:
+def parse_veeam_rest_managed_servers(string_table) -> Section | None:
+    """Parse JSON list of managed servers into dict by name for O(1) lookup."""
+    data = parse_json_section(string_table)
+    if not data or not isinstance(data, list):
         return None
-
-    try:
-        json_str = "".join(line[0] for line in string_table)
-        return json.loads(json_str)
-    except (json.JSONDecodeError, IndexError):
-        return None
+    return {s.get("name"): s for s in data if s.get("name")} or None
 
 
 agent_section_veeam_rest_managed_servers = AgentSection(
@@ -55,10 +51,8 @@ def discover_veeam_rest_managed_servers(section: Section) -> DiscoveryResult:
     if not section:
         return
 
-    for server in section:
-        server_name = server.get("name")
-        if server_name:
-            yield Service(item=server_name)
+    for name in section:
+        yield Service(item=name)
 
 
 # =============================================================================
@@ -97,13 +91,8 @@ def check_veeam_rest_managed_servers(
         yield Result(state=State.UNKNOWN, summary="No data received from agent")
         return
 
-    # Find the server by name
-    server = None
-    for s in section:
-        if s.get("name") == item:
-            server = s
-            break
-
+    # O(1) lookup by name
+    server = section.get(item)
     if server is None:
         yield Result(state=State.UNKNOWN, summary="Server not found")
         return

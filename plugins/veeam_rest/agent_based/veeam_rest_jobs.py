@@ -5,7 +5,6 @@ Check plugin for Veeam Backup Jobs.
 Monitors backup and replication job status, last result, and schedule.
 """
 
-import json
 from collections.abc import Mapping
 from datetime import datetime
 from typing import Any
@@ -19,12 +18,12 @@ from cmk.agent_based.v2 import (
     Result,
     Service,
     State,
-    StringTable,
     render,
 )
 
 from cmk_addons.plugins.veeam_rest.lib import (
     parse_duration_to_seconds,
+    parse_json_section,
     parse_rate_to_bytes_per_second,
 )
 
@@ -33,19 +32,29 @@ from cmk_addons.plugins.veeam_rest.lib import (
 # SECTION PARSING
 # =============================================================================
 
-Section = list[dict[str, Any]]
+Section = dict[str, dict[str, Any]]  # "Category - Name" -> job data
 
 
-def parse_veeam_rest_jobs(string_table: StringTable) -> Section | None:
-    """Parse JSON output from special agent."""
-    if not string_table:
+def _get_job_item(job: dict[str, Any]) -> str | None:
+    """Get the service item name for a job."""
+    name = job.get("name")
+    if not name:
         return None
+    category = _get_job_category(job)
+    return f"{category} - {name}"
 
-    try:
-        json_str = "".join(line[0] for line in string_table)
-        return json.loads(json_str)
-    except (json.JSONDecodeError, IndexError):
+
+def parse_veeam_rest_jobs(string_table) -> Section | None:
+    """Parse JSON list of jobs into dict by 'Category - Name' for O(1) lookup."""
+    data = parse_json_section(string_table)
+    if not data or not isinstance(data, list):
         return None
+    result = {}
+    for job in data:
+        item = _get_job_item(job)
+        if item:
+            result[item] = job
+    return result or None
 
 
 agent_section_veeam_rest_jobs = AgentSection(
@@ -111,13 +120,8 @@ def discover_veeam_rest_jobs(section: Section) -> DiscoveryResult:
     if not section:
         return
 
-    for job in section:
-        job_name = job.get("name")
-        if job_name:
-            # Include job type category in item for service name differentiation
-            category = _get_job_category(job)
-            item = f"{category} - {job_name}"
-            yield Service(item=item)
+    for item in section:
+        yield Service(item=item)
 
 
 # =============================================================================
@@ -199,17 +203,8 @@ def check_veeam_rest_jobs(
         yield Result(state=State.UNKNOWN, summary="No data received from agent")
         return
 
-    # Find the job by matching the item format "Category - Name"
-    job = None
-    for j in section:
-        job_name = j.get("name")
-        if job_name:
-            category = _get_job_category(j)
-            expected_item = f"{category} - {job_name}"
-            if expected_item == item:
-                job = j
-                break
-
+    # O(1) lookup by "Category - Name"
+    job = section.get(item)
     if job is None:
         yield Result(state=State.UNKNOWN, summary="Job not found")
         return

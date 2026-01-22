@@ -5,7 +5,6 @@ Check plugin for Veeam WAN Accelerators.
 Monitors WAN accelerator status and cache configuration.
 """
 
-import json
 from collections.abc import Mapping
 from typing import Any
 
@@ -18,28 +17,25 @@ from cmk.agent_based.v2 import (
     Result,
     Service,
     State,
-    StringTable,
     render,
 )
+
+from cmk_addons.plugins.veeam_rest.lib import parse_json_section
 
 
 # =============================================================================
 # SECTION PARSING
 # =============================================================================
 
-Section = list[dict[str, Any]]
+Section = dict[str, dict[str, Any]]  # name -> accelerator data
 
 
-def parse_veeam_rest_wan_accelerators(string_table: StringTable) -> Section | None:
-    """Parse JSON output from special agent."""
-    if not string_table:
+def parse_veeam_rest_wan_accelerators(string_table) -> Section | None:
+    """Parse JSON list of WAN accelerators into dict by name for O(1) lookup."""
+    data = parse_json_section(string_table)
+    if not data or not isinstance(data, list):
         return None
-
-    try:
-        json_str = "".join(line[0] for line in string_table)
-        return json.loads(json_str)
-    except (json.JSONDecodeError, IndexError):
-        return None
+    return {a.get("name"): a for a in data if a.get("name")} or None
 
 
 agent_section_veeam_rest_wan_accelerators = AgentSection(
@@ -57,10 +53,8 @@ def discover_veeam_rest_wan_accelerators(section: Section) -> DiscoveryResult:
     if not section:
         return
 
-    for accelerator in section:
-        name = accelerator.get("name")
-        if name:
-            yield Service(item=name)
+    for name in section:
+        yield Service(item=name)
 
 
 # =============================================================================
@@ -85,13 +79,8 @@ def check_veeam_rest_wan_accelerators(
         yield Result(state=State.UNKNOWN, summary="No data received from agent")
         return
 
-    # Find the WAN accelerator by name
-    accelerator = None
-    for a in section:
-        if a.get("name") == item:
-            accelerator = a
-            break
-
+    # O(1) lookup by name
+    accelerator = section.get(item)
     if accelerator is None:
         yield Result(state=State.UNKNOWN, summary="WAN accelerator not found")
         return

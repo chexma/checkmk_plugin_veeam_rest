@@ -5,7 +5,6 @@ Check plugin for Veeam Backup Proxies.
 Monitors proxy online status and configuration.
 """
 
-import json
 from collections.abc import Mapping
 from typing import Any
 
@@ -17,27 +16,24 @@ from cmk.agent_based.v2 import (
     Result,
     Service,
     State,
-    StringTable,
 )
+
+from cmk_addons.plugins.veeam_rest.lib import parse_json_section
 
 
 # =============================================================================
 # SECTION PARSING
 # =============================================================================
 
-Section = list[dict[str, Any]]
+Section = dict[str, dict[str, Any]]  # name -> proxy data
 
 
-def parse_veeam_rest_proxies(string_table: StringTable) -> Section | None:
-    """Parse JSON output from special agent."""
-    if not string_table:
+def parse_veeam_rest_proxies(string_table) -> Section | None:
+    """Parse JSON list of proxies into dict by name for O(1) lookup."""
+    data = parse_json_section(string_table)
+    if not data or not isinstance(data, list):
         return None
-
-    try:
-        json_str = "".join(line[0] for line in string_table)
-        return json.loads(json_str)
-    except (json.JSONDecodeError, IndexError):
-        return None
+    return {p.get("name"): p for p in data if p.get("name")} or None
 
 
 agent_section_veeam_rest_proxies = AgentSection(
@@ -55,10 +51,8 @@ def discover_veeam_rest_proxies(section: Section) -> DiscoveryResult:
     if not section:
         return
 
-    for proxy in section:
-        proxy_name = proxy.get("name")
-        if proxy_name:
-            yield Service(item=proxy_name)
+    for name in section:
+        yield Service(item=name)
 
 
 # =============================================================================
@@ -82,13 +76,8 @@ def check_veeam_rest_proxies(
         yield Result(state=State.UNKNOWN, summary="No data received from agent")
         return
 
-    # Find the proxy by name
-    proxy = None
-    for p in section:
-        if p.get("name") == item:
-            proxy = p
-            break
-
+    # O(1) lookup by name
+    proxy = section.get(item)
     if proxy is None:
         yield Result(state=State.UNKNOWN, summary="Proxy not found")
         return
