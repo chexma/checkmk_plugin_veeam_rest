@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.52] - 2026-01-22
+
+### Fixed
+- **Restore Points Threshold Check**: Fixed `TypeError: Incorrect level parameters` error
+  - Use correct `("fixed", (warn, crit))` format for `check_levels()` levels_lower/upper
+  - Affects both `veeam_rest_backup_objects.py` and `veeam_rest_vm_backup.py`
+
 ## [0.0.51] - 2026-01-22
 
 ### Changed

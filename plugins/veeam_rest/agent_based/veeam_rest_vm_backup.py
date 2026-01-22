@@ -126,10 +126,10 @@ def check_veeam_rest_vm_backup(
     # Check minimum restore points
     min_warn = params.get("restore_points_min_warn")
     min_crit = params.get("restore_points_min_crit")
-    if min_warn is not None or min_crit is not None:
+    if min_warn is not None and min_crit is not None:
         yield from check_levels(
             restore_point_count,
-            levels_lower=(min_warn, min_crit) if min_warn is not None and min_crit is not None else None,
+            levels_lower=("fixed", (float(min_warn), float(min_crit))),
             render_func=lambda x: str(int(x)),
             label="Restore points",
             notice_only=True,
@@ -138,10 +138,10 @@ def check_veeam_rest_vm_backup(
     # Check maximum restore points
     max_warn = params.get("restore_points_max_warn")
     max_crit = params.get("restore_points_max_crit")
-    if max_warn is not None or max_crit is not None:
+    if max_warn is not None and max_crit is not None:
         yield from check_levels(
             restore_point_count,
-            levels_upper=(max_warn, max_crit) if max_warn is not None and max_crit is not None else None,
+            levels_upper=("fixed", (float(max_warn), float(max_crit))),
             render_func=lambda x: str(int(x)),
             label="Restore points",
             notice_only=True,
