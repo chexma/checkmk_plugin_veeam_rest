@@ -126,7 +126,16 @@ def _parameter_form() -> Dictionary:
                             title=Title("WAN Accelerators"),
                         ),
                     ],
-                    prefill=DefaultValue(["jobs", "repositories", "proxies"]),
+                    prefill=DefaultValue([
+                        "jobs",
+                        "repositories",
+                        "proxies",
+                        "managed_servers",
+                        "license",
+                        "server",
+                        "scaleout_repositories",
+                        "wan_accelerators",
+                    ]),
                 ),
             ),
             # Service output options
@@ -194,7 +203,7 @@ def _parameter_form() -> Dictionary:
                         "jobs": DictElement(
                             required=False,
                             parameter_form=TimeSpan(
-                                title=Title("Jobs"),
+                                title=Title("Backup Jobs"),
                                 help_text=Help("Default: 5 minutes"),
                                 displayed_magnitudes=[TimeMagnitude.MINUTE, TimeMagnitude.HOUR],
                                 prefill=DefaultValue(300),
@@ -230,7 +239,7 @@ def _parameter_form() -> Dictionary:
                         "license": DictElement(
                             required=False,
                             parameter_form=TimeSpan(
-                                title=Title("License"),
+                                title=Title("License Information"),
                                 help_text=Help("Default: 24 hours"),
                                 displayed_magnitudes=[TimeMagnitude.HOUR, TimeMagnitude.DAY],
                                 prefill=DefaultValue(86400),
@@ -239,7 +248,7 @@ def _parameter_form() -> Dictionary:
                         "server": DictElement(
                             required=False,
                             parameter_form=TimeSpan(
-                                title=Title("Server Info"),
+                                title=Title("Backup Server Information"),
                                 help_text=Help("Default: 24 hours"),
                                 displayed_magnitudes=[TimeMagnitude.HOUR, TimeMagnitude.DAY],
                                 prefill=DefaultValue(86400),

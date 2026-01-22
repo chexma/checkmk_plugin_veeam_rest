@@ -888,8 +888,8 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--sections",
         nargs="*",
-        default=["jobs", "repositories", "proxies"],
-        help="Sections to collect (default: jobs, repositories, proxies)"
+        default=["jobs", "repositories", "proxies", "managed_servers", "license", "server", "scaleout_repositories", "wan_accelerators"],
+        help="Sections to collect (default: all sections)"
     )
     parser.add_argument(
         "--backup-mode",

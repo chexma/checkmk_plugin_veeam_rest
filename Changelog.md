@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.54] - 2026-01-22
+
+### Changed
+- **Default Sections**: All 8 sections now enabled by default (previously only jobs, repositories, proxies)
+  - Added: managed_servers, license, server, scaleout_repositories, wan_accelerators
+- **Consistent Naming**: Aligned cache interval titles with section selection titles
+  - "Jobs" → "Backup Jobs"
+  - "License" → "License Information"
+  - "Server Info" → "Backup Server Information"
+
 ## [0.0.53] - 2026-01-22
 
 ### Changed
