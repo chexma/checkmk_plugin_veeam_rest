@@ -1040,19 +1040,6 @@ The password will be prompted securely (hidden input).
         else:
             print(info("No VMs with Warning/Failed task results found in warning sessions"))
 
-        # Compare with unfiltered fetch
-        print_subheader("Task Sessions Performance Comparison")
-        tasks_all, task_all_time, task_all_calls = api_get_paginated(
-            session, base_url, "taskSessions", token, verify_ssl
-        )
-        print(f"  All task sessions:     {len(tasks_all):>6} items in {task_all_time:>6.0f}ms ({task_all_calls} calls)")
-        print(f"  Filtered (24h):        {len(tasks_filtered):>6} items in {task_time:>6.0f}ms ({task_calls} calls)")
-        timing.add("taskSessions (ALL)", task_all_time, task_all_calls)
-
-        if task_all_time > 0:
-            speedup = task_all_time / task_time if task_time > 0 else 0
-            print(f"\n  {Colors.GREEN}Filtered fetch is ~{speedup:.1f}x faster{Colors.END}")
-
     # =========================================================================
     # TEST 9: Performance Test (Bulk vs Per-Object API Calls)
     # =========================================================================
