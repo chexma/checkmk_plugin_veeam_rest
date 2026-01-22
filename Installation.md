@@ -272,7 +272,10 @@ The special agent caches API responses to reduce load on the Veeam server.
 | Proxies | 5 min | Fast API, status important |
 | Scale-Out Repos | 5 min | Fast API |
 | WAN Accelerators | 5 min | Fast API |
+| Replicas | 5 min | DR monitoring, status important |
 | Managed Servers | 1 hour | Rarely changes |
+| Config Backup | 1 hour | Rarely changes |
+| Security | 1 hour | Compliance checks rarely change |
 | License | 24 hours | Rarely changes |
 | Server Info | 24 hours | Rarely changes |
 

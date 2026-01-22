@@ -12,6 +12,9 @@ Checkmk 2.4 plugin for monitoring Veeam Backup & Replication (Version 13 and abo
 - **License** - Status, expiration, instance usage with threshold display
 - **Scale-Out Repositories** - Extent health, tier status
 - **WAN Accelerators** - Cache size, configuration
+- **Replicas** - Disaster recovery replica monitoring (vSphere/Hyper-V)
+- **Configuration Backup** - Veeam config backup status with age thresholds
+- **Security Compliance** - Best practice violations and security checks
 - **Malware Status** - Backup scan status (Clean/Infected/Suspicious) in backup services
 - **Piggyback Support** - Attach backup services to monitored hosts
 - **Performance Graphs** - Job duration, data transfer, repository usage trends
@@ -33,6 +36,9 @@ See [Installation Guide](Installation.md) for detailed setup instructions includ
 | Veeam Backup Server | Backup server information |
 | Veeam SOBR {name} | Scale-out backup repository status |
 | Veeam WAN {name} | WAN accelerator status |
+| Veeam Replica {name} | DR replica status (vSphere/Hyper-V) |
+| Veeam Config Backup | Configuration backup status and age |
+| Veeam Security Compliance | Security best practice check results |
 
 ## Sections
 
@@ -48,6 +54,9 @@ All sections are enabled by default:
 | server | Backup server info |
 | scaleout_repositories | Scale-out repositories |
 | wan_accelerators | WAN accelerators |
+| replicas | DR replicas (vSphere/Hyper-V) |
+| config_backup | Configuration backup status |
+| security | Security compliance checks |
 
 ## Rulesets
 
@@ -57,6 +66,8 @@ All sections are enabled by default:
 | Veeam Backup (VM/Object) | Veeam Backup * | Backup age, malware status state mapping |
 | Veeam Repositories | Veeam Repository * | Usage levels, free space thresholds |
 | Veeam License | Veeam License | Expiration thresholds, instance usage |
+| Veeam Configuration Backup | Veeam Config Backup | Backup age thresholds (default: 7/14 days) |
+| Veeam Security Compliance | Veeam Security Compliance | Failed checks thresholds (default: 1/5) |
 
 ## Requirements
 
