@@ -227,13 +227,13 @@ This single filter controls the age of both **task sessions** AND **restore poin
 
 ```
 # For environments with daily backups (default)
-Maximum Data Age: 24 hours
+Fetch Data From Last: 24 hours
 
 # For environments with hourly backups (reduce API load)
-Maximum Data Age: 4 hours
+Fetch Data From Last: 4 hours
 
 # For environments with weekly backups
-Maximum Data Age: 7 days
+Fetch Data From Last: 7 days
 ```
 
 **Performance impact:**
