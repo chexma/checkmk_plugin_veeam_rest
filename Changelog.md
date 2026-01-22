@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.47] - 2026-01-22
+
+### Fixed
+- **Critical: Backup Objects Filter**: Fixed filter that removed ALL backup objects
+  - The `backupId` field doesn't exist in `/api/v1/backupObjects` API response
+  - Changed filter to use name prefix "outdated_" instead
+  - This restores all backup object services that disappeared in 0.0.44/0.0.45
+
+### Changed
+- **Piggyback Hostname**: Removed automatic lowercase conversion
+  - Hostnames now keep original case, only spaces are replaced with underscores
+  - Example: `KGM-SEAL-01` instead of `kgm-seal-01`
+
 ## [0.0.46] - 2026-01-21
 
 ### Added
