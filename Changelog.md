@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.55] - 2026-01-22
+
+### Fixed
+- **Backup Age Threshold**: Fixed `TypeError: Incorrect level parameters` error
+  - Use correct `("fixed", (warn, crit))` format for `check_levels()` levels_upper
+  - Convert backup age thresholds from hours (config) to seconds (comparison)
+
 ## [0.0.54] - 2026-01-22
 
 ### Changed

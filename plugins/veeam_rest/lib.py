@@ -222,12 +222,17 @@ def yield_backup_metrics(
     # --- Backup Age ---
     backup_age = data.get("backupAgeSeconds")
     if backup_age is not None:
-        age_warn = params.get("backup_age_warn")
-        age_crit = params.get("backup_age_crit")
+        age_warn_hours = params.get("backup_age_warn")
+        age_crit_hours = params.get("backup_age_crit")
+
+        # Convert hours to seconds for comparison
+        levels = None
+        if age_warn_hours and age_crit_hours:
+            levels = ("fixed", (age_warn_hours * 3600, age_crit_hours * 3600))
 
         yield from check_levels(
             backup_age,
-            levels_upper=(age_warn, age_crit) if age_warn and age_crit else None,
+            levels_upper=levels,
             metric_name="veeam_rest_backup_age",
             render_func=render.timespan,
             label="Backup age",
