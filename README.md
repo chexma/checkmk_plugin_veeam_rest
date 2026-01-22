@@ -12,8 +12,8 @@ Checkmk 2.4 plugin for monitoring Veeam Backup & Replication (Version 13 and abo
 - **License** - Status, expiration, instance usage with threshold display
 - **Scale-Out Repositories** - Extent health, tier status
 - **WAN Accelerators** - Cache size, configuration
-- **Malware Detection** - Events and backup scan status combined
-- **Piggyback Support** - Attach backup/malware services to monitored hosts
+- **Malware Status** - Backup scan status (Clean/Infected/Suspicious) in backup services
+- **Piggyback Support** - Attach backup services to monitored hosts
 - **Performance Graphs** - Job duration, data transfer, repository usage trends
 
 ## Installation
@@ -25,8 +25,7 @@ See [Installation Guide](installation.md) for detailed setup instructions includ
 | Service | Description |
 |---------|-------------|
 | Veeam Job {type} - {name} | Backup job status, duration, processed data |
-| Veeam Backup {object} | Per-object backup status, job name, restore points |
-| Veeam Malware {machine} | Malware events + backup scan status combined |
+| Veeam Backup {object} | Per-object backup status, malware scan, restore points |
 | Veeam Repository {name} | Repository capacity and usage |
 | Veeam Proxy {name} | Proxy online status |
 | Veeam Server {name} | Managed server availability |
@@ -47,51 +46,49 @@ See [Installation Guide](installation.md) for detailed setup instructions includ
 | server | No | Backup server info |
 | scaleout_repositories | No | Scale-out repositories |
 | wan_accelerators | No | WAN accelerators |
-| malware_events | No | Malware detection events |
 
 ## Rulesets
 
 | Ruleset | Service | Parameters |
 |---------|---------|------------|
 | Veeam Backup Jobs | Veeam Job * | Job age, result/status state mapping |
-| Veeam Backup (VM/Object) | Veeam Backup * | Backup age thresholds |
-| Veeam Malware Events | Veeam Malware * | Malware status state mapping (Clean/Infected/Suspicious/NotScanned) |
+| Veeam Backup (VM/Object) | Veeam Backup * | Backup age, malware status state mapping |
 | Veeam Repositories | Veeam Repository * | Usage levels, free space thresholds |
 | Veeam License | Veeam License | Expiration thresholds, instance usage |
 
 ## Performance Optimization
 
-### Restore Points Filter
+### Fetch Data From Last
 
-For large environments with many VMs and long backup history, fetching all restore points can be slow (e.g., 12,000+ restore points = 100+ seconds). The agent filters restore points by age to dramatically improve performance:
+Controls how far back the agent fetches task sessions and restore points. Set based on your backup frequency:
 
-| Setting | Default | Description |
-|---------|---------|-------------|
-| Restore Points Age | 7 days | Only fetch restore points from the last N days |
+| Backup Frequency | Recommended Value |
+|------------------|-------------------|
+| Daily backups | 24 hours (default) |
+| Weekly backups | 7 days |
+| Bi-weekly backups | 14 days |
 
-**Impact Example (105 VMs):**
-- Without filter: 12,709 restore points, 104 seconds
-- With 7-day filter: ~735 restore points, 3-5 seconds
+**Performance Impact:**
+- Without filter: 50,000+ sessions + 12,000+ restore points → 130+ seconds
+- With 24h filter: ~500 sessions + ~500 restore points → ~4 seconds
 
-Configure in: Setup > Agents > Other integrations > Veeam Backup & Replication (REST API)
-
-**Note:** VMs without a backup in the configured time window will show no backup age, which can indicate a backup problem.
+Configure in: Setup > Agents > Other integrations > Veeam Backup & Replication (REST API) > "Fetch Data From Last"
 
 ## Caching
 
-The agent supports per-section caching to reduce API load:
+The agent caches API responses to reduce load. Default intervals optimized for typical use:
 
-| Section | Default Cache |
-|---------|---------------|
-| Jobs | 5 min |
-| Repositories | 30 min |
-| Proxies | 1 hour |
-| Managed Servers | 1 hour |
-| License | 24 hours |
-| Server Info | 24 hours |
-| Scale-Out Repos | 30 min |
-| WAN Accelerators | 1 hour |
-| Malware Events | 5 min |
+| Section | Default Cache | Reason |
+|---------|---------------|--------|
+| Jobs | 30 min | Backups run hourly/daily |
+| Backup Objects | 30 min | Slow API, backups run hourly/daily |
+| Repositories | 5 min | Fast API, capacity changes matter |
+| Proxies | 5 min | Fast API, status important |
+| Managed Servers | 1 hour | Rarely changes |
+| License | 24 hours | Rarely changes |
+| Server Info | 24 hours | Rarely changes |
+| Scale-Out Repos | 5 min | Fast API |
+| WAN Accelerators | 5 min | Fast API |
 
 Configure custom intervals via GUI or disable with `--no-cache`.
 
