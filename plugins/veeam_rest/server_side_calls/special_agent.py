@@ -61,11 +61,6 @@ def _agent_arguments(
     if backup_mode != "disabled":
         args.extend(["--backup-mode", backup_mode.replace("_", "-")])
 
-    # Malware service output mode
-    malware_mode = params.get("malware_mode", "disabled")
-    if malware_mode != "disabled":
-        args.extend(["--malware-mode", malware_mode.replace("_", "-")])
-
     # Session age filter
     if "session_age" in params:
         args.extend(["--session-age", str(int(params["session_age"]))])

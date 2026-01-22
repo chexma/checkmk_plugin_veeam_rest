@@ -125,10 +125,6 @@ def _parameter_form() -> Dictionary:
                             name="wan_accelerators",
                             title=Title("WAN Accelerators"),
                         ),
-                        MultipleChoiceElement(
-                            name="malware_events",
-                            title=Title("Malware Detection Events"),
-                        ),
                     ],
                     prefill=DefaultValue(["jobs", "repositories", "proxies"]),
                 ),
@@ -157,35 +153,13 @@ def _parameter_form() -> Dictionary:
                     prefill=DefaultValue("disabled"),
                 ),
             ),
-            "malware_mode": DictElement(
-                required=False,
-                parameter_form=SingleChoice(
-                    title=Title("Malware Services"),
-                    help_text=Help(
-                        "Configure how malware event services are created. "
-                        "Requires 'Malware Detection Events' in Sections to Collect."
-                    ),
-                    elements=[
-                        SingleChoiceElement(name="disabled", title=Title("Disabled")),
-                        SingleChoiceElement(
-                            name="piggyback_hosts",
-                            title=Title("Attach to Hosts"),
-                        ),
-                        SingleChoiceElement(
-                            name="backup_server",
-                            title=Title("Attach to Backup Server"),
-                        ),
-                    ],
-                    prefill=DefaultValue("disabled"),
-                ),
-            ),
             # Filtering options
             "session_age": DictElement(
                 required=False,
                 parameter_form=TimeSpan(
-                    title=Title("Maximum Task/Malware Event Age"),
+                    title=Title("Maximum Task Session Age"),
                     help_text=Help(
-                        "Only fetch task sessions (for backup metrics) and malware events "
+                        "Only fetch task sessions (for backup metrics) "
                         "younger than this. Reducing this value improves performance."
                     ),
                     displayed_magnitudes=[TimeMagnitude.HOUR, TimeMagnitude.DAY],
@@ -298,15 +272,6 @@ def _parameter_form() -> Dictionary:
                                 help_text=Help("Default: 1 hour"),
                                 displayed_magnitudes=[TimeMagnitude.MINUTE, TimeMagnitude.HOUR],
                                 prefill=DefaultValue(3600),
-                            ),
-                        ),
-                        "malware_events": DictElement(
-                            required=False,
-                            parameter_form=TimeSpan(
-                                title=Title("Malware Events"),
-                                help_text=Help("Default: 5 minutes"),
-                                displayed_magnitudes=[TimeMagnitude.MINUTE, TimeMagnitude.HOUR],
-                                prefill=DefaultValue(300),
                             ),
                         ),
                     },

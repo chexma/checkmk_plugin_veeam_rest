@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.49] - 2026-01-22
+
+### Removed
+- **Special Agent Ruleset Cleanup**: Removed all malware-related GUI options
+  - Removed "Malware Detection Events" from sections
+  - Removed "Malware Services" mode selector
+  - Removed "Malware Events" cache interval
+  - Renamed "Maximum Task/Malware Event Age" to "Maximum Task Session Age"
+
 ## [0.0.48] - 2026-01-22
 
 ### Changed
