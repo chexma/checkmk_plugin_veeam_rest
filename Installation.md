@@ -90,16 +90,22 @@ Following the **principle of least privilege**, create a dedicated user account 
 | **Veeam Backup Operator** | Viewer + can start/stop jobs | Not needed for monitoring |
 | **Veeam Backup Administrator** | Full access including license info | Only if license monitoring required |
 
-### Role Limitations
+### Role Limitations & Security Recommendation
+
+> **Security Recommendation:** Use the **Veeam Backup Viewer** role. Avoid using Administrator until Veeam implements granular RBAC.
 
 The **Veeam Backup Viewer** role is the most secure choice but has limitations:
 
 - Cannot access license information (license section will be empty)
 - Cannot view some advanced configuration details
 
-If you need license monitoring, you must use the **Veeam Backup Administrator** role.
+**Why avoid the Administrator role?**
 
-> **Note:** The Veeam REST API currently lacks granular RBAC. You cannot create a custom role with "Viewer + License" permissions. See [Veeam Forums](https://forums.veeam.com/post561632.html#p561632) for discussion.
+The Veeam REST API currently lacks granular role-based access control (RBAC). There is no "Viewer + License" role available. Using the Administrator role for monitoring grants unnecessary write permissions (create/delete jobs, modify configurations), which violates security best practices.
+
+**Recommendation:** Accept the license monitoring limitation and use the Viewer role until Veeam delivers granular RBAC support. Monitor license expiration through other means (e.g., Veeam email notifications).
+
+See [Veeam Forums Discussion](https://forums.veeam.com/post561632.html#p561632) for the RBAC feature request.
 
 ## Step 4: Add the Veeam Host to Checkmk
 
