@@ -988,7 +988,8 @@ The password will be prompted securely (hidden input).
                     "sessionId": job.get("sessionId"),
                     "lastRun": job.get("lastRun"),
                 })
-                print(f"  {warn(f'{job.get(\"name\")}: {result}')}")
+                job_name = job.get("name", "Unknown")
+                print(f"  {warn(f'{job_name}: {result}')}")
                 print(f"    Session ID: {job.get('sessionId')}")
 
     if not warning_jobs:
