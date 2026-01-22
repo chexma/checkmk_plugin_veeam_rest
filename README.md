@@ -18,7 +18,7 @@ Checkmk 2.4 plugin for monitoring Veeam Backup & Replication (Version 13 and abo
 
 ## Installation
 
-See [Installation Guide](installation.md) for detailed setup instructions including Veeam user configuration and troubleshooting.
+See [Installation Guide](Installation.md) for detailed setup instructions including Veeam user configuration and troubleshooting.
 
 ## Services Created
 
