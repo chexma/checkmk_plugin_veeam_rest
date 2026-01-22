@@ -208,13 +208,13 @@ Enable "Disable SSL certificate verification" in the special agent rule, or inst
 
 1. Check the special agent output in **Service > Check Veeam data source**
 2. Verify sections are enabled in the rule
-3. Ensure the Veeam server has jobs/repositories configured
 
 ### Piggyback services not appearing
 
 1. The target VMs must exist as hosts in Checkmk
 2. VM names in Veeam must match hostnames in Checkmk (case-insensitive)
 3. Run discovery on the VM hosts, not just the Veeam server
+4. Use the piggyback translation rule to match hostnames if different in veeam and checkmk
 
 ## Performance Tuning
 

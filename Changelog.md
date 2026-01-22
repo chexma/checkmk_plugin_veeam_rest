@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.56] - 2026-01-22
+
+### Added
+- **TypedDict Type Hints**: Added 8 TypedDicts to `lib.py` for better IDE support
+  - `SessionProgress`, `RestorePointData`, `WarningInfo`, `TaskData`
+  - `JobData`, `RepositoryData`, `ProxyData`, `BackupObjectData`
+- **Section Type Aliases**: Added `JobSection`, `RepositorySection`, `ProxySection`, `BackupObjectSection`
+
+### Improved
+- **Docstrings**: Enhanced documentation for complex functions in special agent
+  - `_get_paginated()`: Pagination logic explained
+  - `enrich_job_data()`: Age calculation documented
+  - `enrich_task_data()`: Duration parsing and limitations
+  - `enrich_backup_objects()`: Performance optimization and bulk matching
+
 ## [0.0.55] - 2026-01-22
 
 ### Fixed

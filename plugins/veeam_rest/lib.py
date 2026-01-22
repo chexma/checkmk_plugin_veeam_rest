@@ -5,7 +5,7 @@ Shared utility functions for Veeam REST monitoring plugin.
 
 import json
 from collections.abc import Iterator, Mapping
-from typing import Any
+from typing import Any, TypedDict
 
 from cmk.agent_based.v2 import (
     CheckResult,
@@ -16,6 +16,126 @@ from cmk.agent_based.v2 import (
     check_levels,
     render,
 )
+
+
+# =============================================================================
+# TYPE DEFINITIONS
+# =============================================================================
+
+
+class SessionProgress(TypedDict, total=False):
+    """Progress data from backup sessions and tasks."""
+
+    duration: str  # "HH:MM:SS" or "D.HH:MM:SS"
+    bottleneck: str  # Source, Proxy, Network, Target, Unknown
+    processedSize: int
+    readSize: int
+    transferredSize: int
+    processingRate: str  # "1.1 GB/s", "500 MB/s"
+    avgSpeed: int
+    totalSize: int
+
+
+class RestorePointData(TypedDict, total=False):
+    """Restore point data from Veeam API."""
+
+    id: str
+    name: str
+    creationTime: str  # ISO 8601 datetime
+    malwareStatus: str  # Clean, Infected, Suspicious, NotScanned
+    originalSize: int
+    backupSize: int
+    dataSize: int
+
+
+class WarningInfo(TypedDict, total=False):
+    """Warning/error info from task sessions."""
+
+    warningTitle: str
+    warningMessage: str
+    jobName: str
+    severity: str  # Warning, Failed
+
+
+class TaskData(TypedDict, total=False):
+    """Task session data for backup objects."""
+
+    name: str
+    sessionId: str
+    state: str
+    endTime: str  # ISO 8601 datetime
+    durationSeconds: int  # Calculated from progress.duration
+    progress: SessionProgress
+
+
+class JobData(TypedDict, total=False):
+    """Backup job data from /api/v1/jobs/states."""
+
+    name: str
+    type: str  # VSphereBackup, HyperVBackup, BackupCopy, etc.
+    status: str  # Running, Inactive, Disabled, Enabled
+    lastResult: str  # Success, Warning, Failed, None
+    lastRun: str  # ISO 8601 datetime
+    nextRun: str  # ISO 8601 datetime
+    progressPercent: int
+    objectsCount: int
+    repositoryName: str
+    description: str
+    workload: str
+    lastRunAgeSeconds: int  # Enriched: seconds since lastRun
+    backupServer: str  # Enriched: server name
+    sessionProgress: SessionProgress
+
+
+class RepositoryData(TypedDict, total=False):
+    """Repository data from /api/v1/backupInfrastructure/repositories/states."""
+
+    name: str
+    type: str  # WinLocal, Smb, AzureBlob, AmazonS3, etc.
+    capacityGB: int
+    freeGB: int
+    usedSpaceGB: int
+    isOnline: bool
+    isOutOfDate: bool
+    hostName: str
+    path: str
+    description: str
+    id: str
+
+
+class ProxyData(TypedDict, total=False):
+    """Proxy data from /api/v1/backupInfrastructure/proxies/states."""
+
+    name: str
+    state: str
+    type: str  # ViProxy, HvProxy, GeneralPurposeProxy
+    hostName: str
+    isDisabled: bool
+    description: str
+    id: str
+
+
+class BackupObjectData(TypedDict, total=False):
+    """Backup object data (VM, agent, etc.) with enriched fields."""
+
+    name: str
+    type: str  # VirtualMachine, Computer, VCloud
+    platformName: str
+    jobName: str  # Enriched: from job lookup
+    restorePointsCount: int
+    lastRunFailed: bool
+    backupServer: str  # Enriched: server name
+    backupAgeSeconds: int  # Enriched: seconds since last backup
+    taskData: TaskData
+    latestRestorePoint: RestorePointData
+    warningInfo: WarningInfo
+
+
+# Section type aliases for check plugins
+JobSection = dict[str, JobData]
+RepositorySection = dict[str, RepositoryData]
+ProxySection = dict[str, ProxyData]
+BackupObjectSection = dict[str, BackupObjectData]
 
 
 # =============================================================================

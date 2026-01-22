@@ -36,7 +36,7 @@ See [Installation Guide](Installation.md) for detailed setup instructions includ
 
 ## Sections
 
-All sections are enabled by default (v0.0.54+):
+All sections are enabled by default:
 
 | Section | Description |
 |---------|-------------|
