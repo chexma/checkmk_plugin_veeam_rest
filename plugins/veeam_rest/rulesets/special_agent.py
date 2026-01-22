@@ -157,26 +157,15 @@ def _parameter_form() -> Dictionary:
             "session_age": DictElement(
                 required=False,
                 parameter_form=TimeSpan(
-                    title=Title("Maximum Task Session Age"),
+                    title=Title("Fetch Data From Last"),
                     help_text=Help(
-                        "Only fetch task sessions (for backup metrics) "
-                        "younger than this. Reducing this value improves performance."
+                        "Fetches task sessions and restore points from the specified time range. "
+                        "This affects backup metrics (size, duration) and malware scan status. "
+                        "Recommended: 24h for daily backups, 7 days for weekly, 14 days for bi-weekly. "
+                        "Shorter values improve API performance significantly."
                     ),
                     displayed_magnitudes=[TimeMagnitude.HOUR, TimeMagnitude.DAY],
                     prefill=DefaultValue(86400),  # 24 hours
-                ),
-            ),
-            "restore_points_days": DictElement(
-                required=False,
-                parameter_form=Integer(
-                    title=Title("Restore Points Age (Days)"),
-                    help_text=Help(
-                        "Only fetch restore points from the last N days. "
-                        "This dramatically improves performance in large environments. "
-                        "Default: 7 days. Set to 0 to fetch all (not recommended)."
-                    ),
-                    prefill=DefaultValue(7),
-                    custom_validate=(validators.NumberInRange(min_value=0, max_value=365),),
                 ),
             ),
             # Caching options

@@ -196,97 +196,49 @@ Enable "Disable SSL certificate verification" in the special agent rule, or inst
 
 ## Performance Tuning
 
-### Understanding the Filter Options
-
-The special agent provides two important filter options that significantly impact performance:
-
-#### Maximum Task Session Age
+### Fetch Data From Last
 
 **Location:** Setup > Agents > Other integrations > Veeam Backup & Replication (REST API)
 
 **What it does:**
-Task sessions contain per-VM/object details for each backup run (status, duration, size, warnings). Large environments can have millions of task sessions accumulated over time.
+This single filter controls the age of both **task sessions** AND **restore points** that are fetched from the Veeam API.
 
-This filter limits which task sessions are fetched based on their creation time.
+- **Task sessions** contain per-VM/object details for each backup run (status, duration, size, warnings)
+- **Restore points** are the actual backup snapshots used to get malware status and latest backup info
 
 **Default:** 24 hours (86400 seconds)
 
 **Impact on monitoring:**
-- Task sessions are used to get backup metrics (size, duration, speed) for the piggyback services
-- Only affects services when using "Backup Services" mode (Attach to Hosts or Attach to Backup Server)
-- Does NOT affect the Job services (they use the jobs API, not task sessions)
+- Task sessions provide backup metrics (size, duration, speed) for piggyback services
+- Restore points provide malware scan status and latest backup time
+- Does NOT affect Job services (they use the jobs API)
+- Does NOT affect restore point count metrics (from backupObjects API)
 
-**Recommended values:**
+**Recommended values - set based on your backup frequency:**
 
-| Backup Frequency | Recommended Value | Reason |
-|------------------|-------------------|--------|
-| Hourly backups | 2-4 hours | Catches the last 2-4 backup runs |
-| Daily backups | 24-48 hours | Catches the last 1-2 backup runs |
-| Weekly backups | 7-14 days | Catches the last 1-2 backup runs |
+| Backup Frequency | Recommended Value | In Seconds |
+|------------------|-------------------|------------|
+| Hourly backups | 2-4 hours | 7200-14400 |
+| Daily backups | 24-48 hours | 86400-172800 |
+| Weekly backups | 7-14 days | 604800-1209600 |
+| Bi-weekly backups | 14-21 days | 1209600-1814400 |
 
 **Examples:**
 
 ```
 # For environments with daily backups (default)
-Maximum Task Session Age: 24 hours
+Maximum Data Age: 24 hours
 
 # For environments with hourly backups (reduce API load)
-Maximum Task Session Age: 4 hours
+Maximum Data Age: 4 hours
 
 # For environments with weekly backups
-Maximum Task Session Age: 14 days
+Maximum Data Age: 7 days
 ```
 
 **Performance impact:**
-- Without filter: 50,000+ task sessions → 30+ seconds API time
-- With 24h filter: ~500 task sessions → ~2 seconds API time
-
----
-
-#### Restore Points Age (Days)
-
-**Location:** Setup > Agents > Other integrations > Veeam Backup & Replication (REST API)
-
-**What it does:**
-Restore points are the actual backup snapshots stored on the repository. Large environments can have tens of thousands of restore points.
-
-This filter limits which restore points are fetched for enriching backup object data (malware status, latest backup time).
-
-**Default:** 7 days
-
-**Impact on monitoring:**
-- Affects the "Malware scan" status shown in backup services
-- Affects the "Latest restore point" information
-- Does NOT affect restore point count metrics (those come from backupObjects API)
-
-**Recommended values:**
-
-| Retention Policy | Recommended Value | Reason |
-|------------------|-------------------|--------|
-| 7 days retention | 7 days (default) | Matches retention period |
-| 14 days retention | 14 days | Matches retention period |
-| 30+ days retention | 14-30 days | Balance between accuracy and performance |
-| Very long retention | 7-14 days | Only recent backups matter for monitoring |
-
-**Examples:**
-
-```
-# Standard setup (default)
-Restore Points Age: 7 days
-
-# Longer retention with frequent backups
-Restore Points Age: 14 days
-
-# Very large environment with 100+ VMs - prioritize performance
-Restore Points Age: 3 days
-
-# Disable filter (fetch ALL restore points) - NOT recommended
-Restore Points Age: 0
-```
-
-**Performance impact:**
-- Without filter (0 days): 12,000+ restore points → 100+ seconds API time
-- With 7-day filter: ~700 restore points → 3-5 seconds API time
+- Without filter: 50,000+ task sessions + 12,000+ restore points → 130+ seconds
+- With 24h filter: ~500 task sessions + ~500 restore points → ~4 seconds
 
 ---
 
@@ -324,8 +276,7 @@ Optimal configuration for most environments:
 
 | Setting | Value | Agent Runtime |
 |---------|-------|---------------|
-| Maximum Task Session Age | 24 hours | ~2s |
-| Restore Points Age | 7 days | ~4s |
+| Fetch Data From Last | 24 hours | ~4s (tasks + restore points) |
 | Caching enabled | Yes (default) | Cache hit: ~0.5s |
 | **Total (worst case)** | | **~8s** |
 | **Total (typical)** | | **~0.5s** |

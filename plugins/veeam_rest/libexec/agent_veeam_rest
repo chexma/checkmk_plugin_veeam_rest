@@ -904,12 +904,6 @@ def parse_arguments() -> argparse.Namespace:
         help="Max session/task age in seconds (default: 86400 = 24h)"
     )
     parser.add_argument(
-        "--restore-points-days",
-        type=int,
-        default=7,
-        help="Only fetch restore points from the last N days (default: 7, 0=all)"
-    )
-    parser.add_argument(
         "-v", "--verbose",
         action="count",
         default=0,
@@ -1078,20 +1072,11 @@ def main() -> int:
                 try:
                     backup_objects = api.get_backup_objects_with_job_info(created_after)
 
-                    # Fetch restore points in bulk with optional time filter
+                    # Fetch restore points in bulk with time filter (uses same session_age as tasks)
                     # This is the major performance optimization for large environments
                     all_restore_points: list[dict] | None = None
                     try:
-                        # Apply time filter if configured (default: 7 days)
-                        rp_created_after: str | None = None
-                        if args.restore_points_days > 0:
-                            rp_created_after = (
-                                datetime.now(timezone.utc) - timedelta(days=args.restore_points_days)
-                            ).strftime("%Y-%m-%dT%H:%M:%SZ")
-                            if args.debug:
-                                sys.stderr.write(f"Filtering restore points to last {args.restore_points_days} days\n")
-
-                        all_restore_points = api.get_all_restore_points(rp_created_after)
+                        all_restore_points = api.get_all_restore_points(created_after)
                         if args.debug:
                             sys.stderr.write(f"Fetched {len(all_restore_points)} restore points in bulk\n")
                     except VeeamAPIError as e:

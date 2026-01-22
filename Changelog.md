@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.51] - 2026-01-22
+
+### Changed
+- **Unified Data Filter**: Merged `--restore-points-days` into `--session-age` parameter
+  - Now one parameter controls both task sessions AND restore points age filter
+  - Renamed GUI field to "Fetch Data From Last" for clarity
+  - Simplifies configuration: set based on backup frequency (24h daily, 7d weekly)
+  - Performance benefit: shorter lookback = faster API response
+
+### Removed
+- `--restore-points-days` CLI argument (now uses `--session-age` for both)
+- "Restore Points Age (Days)" GUI option (merged into "Fetch Data From Last")
+
 ## [0.0.50] - 2026-01-22
 
 ### Changed
