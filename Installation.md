@@ -230,10 +230,6 @@ This single filter controls the age of both **task sessions** AND **restore poin
 
 **Default:** 24 hours (86400 seconds)
 
-**Impact on monitoring:**
-- Task sessions provide backup metrics (size, duration, speed) for piggyback services
-- Restore points provide malware scan status and latest backup time
-
 **Recommended values - set based on your backup frequency:**
 
 | Backup Frequency | Recommended Value | In Seconds |
@@ -266,7 +262,7 @@ Fetch Data From Last: 7 days
 
 The special agent caches API responses to reduce load on the Veeam server.
 
-**Default cache intervals (v0.0.50+):**
+**Default cache intervals:**
 
 | Section | Cache Time | Reason |
 |---------|------------|--------|
