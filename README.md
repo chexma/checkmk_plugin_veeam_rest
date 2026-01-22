@@ -42,21 +42,23 @@ See [Installation Guide](Installation.md) for detailed setup instructions includ
 
 ## Sections
 
-All sections are enabled by default:
+All sections are enabled by default. Some sections require elevated permissions:
 
-| Section | Description |
-|---------|-------------|
-| jobs | Backup job states |
-| repositories | Repository capacity |
-| proxies | Proxy status |
-| managed_servers | Managed infrastructure (vCenter, ESXi, Hyper-V) |
-| license | License information |
-| server | Backup server info |
-| scaleout_repositories | Scale-out repositories |
-| wan_accelerators | WAN accelerators |
-| replicas | DR replicas (vSphere/Hyper-V) |
-| config_backup | Configuration backup status |
-| security | Security compliance checks |
+| Section | Description | Required Role |
+|---------|-------------|---------------|
+| jobs | Backup job states | Viewer |
+| repositories | Repository capacity | Viewer |
+| proxies | Proxy status | Viewer |
+| managed_servers | Managed infrastructure (vCenter, ESXi, Hyper-V) | Viewer |
+| license | License information | **Administrator** |
+| server | Backup server info | Viewer |
+| scaleout_repositories | Scale-out repositories | Viewer |
+| wan_accelerators | WAN accelerators | Viewer |
+| replicas | DR replicas (vSphere/Hyper-V) | Admin, Restore Operator |
+| config_backup | Configuration backup status | **Administrator only** |
+| security | Security compliance checks | Admin, Security Admin |
+
+**Note:** Sections requiring Administrator role will return 403 Forbidden with Viewer role. Disable these sections in the agent configuration if using a restricted account.
 
 ## Rulesets
 

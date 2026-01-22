@@ -99,6 +99,20 @@ The **Veeam Backup Viewer** role is the most secure choice but has limitations:
 - Cannot access license information (license section will be empty)
 - Cannot view some advanced configuration details
 
+**Section Permissions by Role:**
+
+| Section | Viewer | Restore Operator | Security Admin | Administrator |
+|---------|:------:|:----------------:|:--------------:|:-------------:|
+| jobs, repositories, proxies | ✓ | ✓ | ✓ | ✓ |
+| managed_servers, server | ✓ | ✓ | ✓ | ✓ |
+| scaleout_repositories, wan_accelerators | ✓ | ✓ | ✓ | ✓ |
+| license | ✗ | ✗ | ✗ | ✓ |
+| replicas | ✗ | ✓ | ✗ | ✓ |
+| config_backup | ✗ | ✗ | ✗ | ✓ |
+| security | ✗ | ✗ | ✓ | ✓ |
+
+**Note:** If a section returns 403 Forbidden, disable it in the special agent configuration to avoid error messages.
+
 **Why avoid the Administrator role?**
 
 The Veeam REST API currently lacks granular role-based access control (RBAC). There is no "Viewer + License" role available. Using the Administrator role for monitoring grants unnecessary write permissions (create/delete jobs, modify configurations), which violates security best practices.
