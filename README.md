@@ -56,42 +56,6 @@ See [Installation Guide](installation.md) for detailed setup instructions includ
 | Veeam Repositories | Veeam Repository * | Usage levels, free space thresholds |
 | Veeam License | Veeam License | Expiration thresholds, instance usage |
 
-## Performance Optimization
-
-### Fetch Data From Last
-
-Controls how far back the agent fetches task sessions and restore points. Set based on your backup frequency:
-
-| Backup Frequency | Recommended Value |
-|------------------|-------------------|
-| Daily backups | 24 hours (default) |
-| Weekly backups | 7 days |
-| Bi-weekly backups | 14 days |
-
-**Performance Impact:**
-- Without filter: 50,000+ sessions + 12,000+ restore points → 130+ seconds
-- With 24h filter: ~500 sessions + ~500 restore points → ~4 seconds
-
-Configure in: Setup > Agents > Other integrations > Veeam Backup & Replication (REST API) > "Fetch Data From Last"
-
-## Caching
-
-The agent caches API responses to reduce load. Default intervals optimized for typical use:
-
-| Section | Default Cache | Reason |
-|---------|---------------|--------|
-| Jobs | 30 min | Backups run hourly/daily |
-| Backup Objects | 30 min | Slow API, backups run hourly/daily |
-| Repositories | 5 min | Fast API, capacity changes matter |
-| Proxies | 5 min | Fast API, status important |
-| Managed Servers | 1 hour | Rarely changes |
-| License | 24 hours | Rarely changes |
-| Server Info | 24 hours | Rarely changes |
-| Scale-Out Repos | 5 min | Fast API |
-| WAN Accelerators | 5 min | Fast API |
-
-Configure custom intervals via GUI or disable with `--no-cache`.
-
 ## Requirements
 
 - Checkmk 2.4.0p1 or later
@@ -108,6 +72,11 @@ The Veeam B&R REST API currently lacks granular role-based access control (RBAC)
 - **Veeam Backup Viewer** - Read-only but lacks access to some data (e.g., license)
 
 See: [Veeam Forums Discussion](https://forums.veeam.com/post561632.html#p561632)
+
+### Tape Job Support
+
+The Veeam B&R REST API currently lacks informations about Tape Jobs.
+This will also be added in a future release.
 
 ## Contributors
 
