@@ -92,14 +92,38 @@ Following the **principle of least privilege**, create a dedicated user account 
 
 ### Role Limitations & Security Recommendation
 
-> **Security Recommendation:** Use the **Veeam Backup Viewer** role. Avoid using Administrator until Veeam implements granular RBAC.
+> **⚠️ SECURITY WARNING: DO NOT use the Veeam Backup Administrator role for monitoring!**
+>
+> The Administrator role grants full write access (create/delete jobs, modify configurations) which violates the principle of least privilege. A compromised monitoring account with Administrator role could delete all your backups.
 
-The **Veeam Backup Viewer** role is the most secure choice but has limitations:
+**Use the Veeam Backup Viewer role.** Accept the limitations until Veeam implements granular RBAC.
 
-- Cannot access license information (license section will be empty)
-- Cannot view some advanced configuration details
+---
 
-**Section Permissions by Role:**
+### Available Sections
+
+| Section | Description | Required Role | Viewer Compatible |
+|---------|-------------|---------------|:-----------------:|
+| jobs | Backup job states | Viewer | ✓ |
+| repositories | Repository capacity | Viewer | ✓ |
+| proxies | Proxy status | Viewer | ✓ |
+| managed_servers | Managed infrastructure (vCenter, ESXi, Hyper-V) | Viewer | ✓ |
+| server | Backup server info | Viewer | ✓ |
+| scaleout_repositories | Scale-out repositories | Viewer | ✓ |
+| wan_accelerators | WAN accelerators | Viewer | ✓ |
+| license | License information | Administrator | ✗ |
+| replicas | DR replicas | Admin, Restore Operator | ✗ |
+| config_backup | Configuration backup status | Administrator | ✗ |
+| security | Security compliance checks | Admin, Security Admin | ✗ |
+
+**Sections requiring Administrator role (license, replicas, config_backup, security):**
+- Return 403 Forbidden with Viewer role
+- Should be **disabled** in the agent configuration when using Viewer role
+- These features are prepared for future use when Veeam REST API provides proper monitoring roles
+
+---
+
+### Section Permissions Matrix
 
 | Section | Viewer | Restore Operator | Security Admin | Administrator |
 |---------|:------:|:----------------:|:--------------:|:-------------:|
@@ -111,13 +135,21 @@ The **Veeam Backup Viewer** role is the most secure choice but has limitations:
 | config_backup | ✗ | ✗ | ✗ | ✓ |
 | security | ✗ | ✗ | ✓ | ✓ |
 
-**Note:** If a section returns 403 Forbidden, disable it in the special agent configuration to avoid error messages.
+---
 
-**Why avoid the Administrator role?**
+### Why NOT to use the Administrator Role
 
-The Veeam REST API currently lacks granular role-based access control (RBAC). There is no "Viewer + License" role available. Using the Administrator role for monitoring grants unnecessary write permissions (create/delete jobs, modify configurations), which violates security best practices.
+The Veeam REST API currently lacks granular role-based access control (RBAC):
 
-**Recommendation:** Accept the license monitoring limitation and use the Viewer role until Veeam delivers granular RBAC support. Monitor license expiration through other means (e.g., Veeam email notifications).
+1. **No "Viewer + License" role** - You cannot get read-only access to license information
+2. **Administrator = Full Write Access** - Can create, modify, and delete backup jobs
+3. **Security Risk** - A compromised monitoring account could destroy your backup infrastructure
+
+**Recommendation:**
+- Use the **Viewer** role and accept the limitations
+- Disable sections that require Administrator: `license`, `replicas`, `config_backup`, `security`
+- Monitor license expiration through Veeam email notifications instead
+- Wait for Veeam to implement granular RBAC (feature request pending)
 
 See [Veeam Forums Discussion](https://forums.veeam.com/post561632.html#p561632) for the RBAC feature request.
 
