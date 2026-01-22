@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.50] - 2026-01-22
+
+### Changed
+- **Optimized Cache Defaults**: Adjusted default cache intervals for better performance
+  - `jobs`: 5 min → **30 min** (backups run hourly/daily)
+  - `backup_objects`: 5 min → **30 min** (slow API ~6s, backups run hourly/daily)
+  - `repositories`: 30 min → **5 min** (fast API 130ms)
+  - `proxies`: 1 hour → **5 min** (fast API 59ms)
+  - `scaleout_repositories`: 30 min → **5 min** (fast API 61ms)
+  - `wan_accelerators`: 1 hour → **5 min** (fast API 2ms)
+  - Effect: 29 of 30 checks use cache, typical runtime ~0.5s instead of ~8.5s
+
 ## [0.0.49] - 2026-01-22
 
 ### Removed

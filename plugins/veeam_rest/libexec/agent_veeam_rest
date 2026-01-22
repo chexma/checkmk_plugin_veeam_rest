@@ -32,15 +32,15 @@ logger = logging.getLogger("agent_veeam_rest")
 @dataclass
 class CachePerSection:
     """Cache intervals per section in seconds. None = no caching."""
-    jobs: int | None = 300              # 5 minutes
-    backup_objects: int | None = 300    # 5 minutes
-    repositories: int | None = 1800     # 30 minutes
-    proxies: int | None = 3600          # 1 hour
+    jobs: int | None = 1800             # 30 minutes - backups run hourly/daily
+    backup_objects: int | None = 1800   # 30 minutes - slow API (~6s), backups run hourly/daily
+    repositories: int | None = 300      # 5 minutes - fast API (130ms)
+    proxies: int | None = 300           # 5 minutes - fast API (59ms)
     managed_servers: int | None = 3600  # 1 hour
     license: int | None = 86400         # 24 hours
     server: int | None = 86400          # 24 hours
-    scaleout_repositories: int | None = 1800  # 30 minutes
-    wan_accelerators: int | None = 3600  # 1 hour
+    scaleout_repositories: int | None = 300   # 5 minutes - fast API (61ms)
+    wan_accelerators: int | None = 300  # 5 minutes - fast API (2ms)
 
 
 def get_cache_dir() -> Path:
