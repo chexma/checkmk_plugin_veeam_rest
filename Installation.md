@@ -121,11 +121,9 @@ For security, store the Veeam user password in Checkmk's password store instead 
    - **Attach to Hosts** - Piggyback services on VMs (requires VMs in Checkmk)
    - **Attach to Backup Server** - Services on Veeam server
 
-6. Configure **Malware Services** mode (same options as above)
+6. Set **Explicit hosts** to your Veeam server hostname
 
-7. Set **Explicit hosts** to your Veeam server hostname
-
-8. Save the rule
+7. Save the rule
 
 ## Step 7: Run Service Discovery
 
@@ -195,6 +193,142 @@ Enable "Disable SSL certificate verification" in the special agent rule, or inst
 1. The target VMs must exist as hosts in Checkmk
 2. VM names in Veeam must match hostnames in Checkmk (case-insensitive)
 3. Run discovery on the VM hosts, not just the Veeam server
+
+## Performance Tuning
+
+### Understanding the Filter Options
+
+The special agent provides two important filter options that significantly impact performance:
+
+#### Maximum Task Session Age
+
+**Location:** Setup > Agents > Other integrations > Veeam Backup & Replication (REST API)
+
+**What it does:**
+Task sessions contain per-VM/object details for each backup run (status, duration, size, warnings). Large environments can have millions of task sessions accumulated over time.
+
+This filter limits which task sessions are fetched based on their creation time.
+
+**Default:** 24 hours (86400 seconds)
+
+**Impact on monitoring:**
+- Task sessions are used to get backup metrics (size, duration, speed) for the piggyback services
+- Only affects services when using "Backup Services" mode (Attach to Hosts or Attach to Backup Server)
+- Does NOT affect the Job services (they use the jobs API, not task sessions)
+
+**Recommended values:**
+
+| Backup Frequency | Recommended Value | Reason |
+|------------------|-------------------|--------|
+| Hourly backups | 2-4 hours | Catches the last 2-4 backup runs |
+| Daily backups | 24-48 hours | Catches the last 1-2 backup runs |
+| Weekly backups | 7-14 days | Catches the last 1-2 backup runs |
+
+**Examples:**
+
+```
+# For environments with daily backups (default)
+Maximum Task Session Age: 24 hours
+
+# For environments with hourly backups (reduce API load)
+Maximum Task Session Age: 4 hours
+
+# For environments with weekly backups
+Maximum Task Session Age: 14 days
+```
+
+**Performance impact:**
+- Without filter: 50,000+ task sessions → 30+ seconds API time
+- With 24h filter: ~500 task sessions → ~2 seconds API time
+
+---
+
+#### Restore Points Age (Days)
+
+**Location:** Setup > Agents > Other integrations > Veeam Backup & Replication (REST API)
+
+**What it does:**
+Restore points are the actual backup snapshots stored on the repository. Large environments can have tens of thousands of restore points.
+
+This filter limits which restore points are fetched for enriching backup object data (malware status, latest backup time).
+
+**Default:** 7 days
+
+**Impact on monitoring:**
+- Affects the "Malware scan" status shown in backup services
+- Affects the "Latest restore point" information
+- Does NOT affect restore point count metrics (those come from backupObjects API)
+
+**Recommended values:**
+
+| Retention Policy | Recommended Value | Reason |
+|------------------|-------------------|--------|
+| 7 days retention | 7 days (default) | Matches retention period |
+| 14 days retention | 14 days | Matches retention period |
+| 30+ days retention | 14-30 days | Balance between accuracy and performance |
+| Very long retention | 7-14 days | Only recent backups matter for monitoring |
+
+**Examples:**
+
+```
+# Standard setup (default)
+Restore Points Age: 7 days
+
+# Longer retention with frequent backups
+Restore Points Age: 14 days
+
+# Very large environment with 100+ VMs - prioritize performance
+Restore Points Age: 3 days
+
+# Disable filter (fetch ALL restore points) - NOT recommended
+Restore Points Age: 0
+```
+
+**Performance impact:**
+- Without filter (0 days): 12,000+ restore points → 100+ seconds API time
+- With 7-day filter: ~700 restore points → 3-5 seconds API time
+
+---
+
+### Caching
+
+The special agent caches API responses to reduce load on the Veeam server.
+
+**Default cache intervals (v0.0.50+):**
+
+| Section | Cache Time | Reason |
+|---------|------------|--------|
+| Jobs | 30 min | Backups typically run hourly/daily |
+| Backup Objects | 30 min | Slow API (~6s), matches job frequency |
+| Repositories | 5 min | Fast API, capacity changes important |
+| Proxies | 5 min | Fast API, status important |
+| Scale-Out Repos | 5 min | Fast API |
+| WAN Accelerators | 5 min | Fast API |
+| Managed Servers | 1 hour | Rarely changes |
+| License | 24 hours | Rarely changes |
+| Server Info | 24 hours | Rarely changes |
+
+**Custom cache intervals:**
+
+Configure via GUI under "Cache Intervals per Section" in the special agent rule.
+
+**Disable caching:**
+
+Enable "Disable Caching" option for always-fresh data (increases API load significantly).
+
+---
+
+### Performance Summary
+
+Optimal configuration for most environments:
+
+| Setting | Value | Agent Runtime |
+|---------|-------|---------------|
+| Maximum Task Session Age | 24 hours | ~2s |
+| Restore Points Age | 7 days | ~4s |
+| Caching enabled | Yes (default) | Cache hit: ~0.5s |
+| **Total (worst case)** | | **~8s** |
+| **Total (typical)** | | **~0.5s** |
 
 ## Upgrading
 
