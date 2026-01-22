@@ -41,6 +41,9 @@ class CachePerSection:
     server: int | None = 86400          # 24 hours
     scaleout_repositories: int | None = 300   # 5 minutes - fast API (61ms)
     wan_accelerators: int | None = 300  # 5 minutes - fast API (2ms)
+    replicas: int | None = 300          # 5 minutes - DR monitoring
+    config_backup: int | None = 3600    # 1 hour - rarely changes
+    security: int | None = 3600         # 1 hour - compliance check
 
 
 def get_cache_dir() -> Path:
@@ -421,6 +424,28 @@ class VeeamRestAPI:
     def get_wan_accelerators(self) -> list[dict]:
         """Get all WAN accelerators."""
         return self._get_paginated("/api/v1/backupInfrastructure/wanAccelerators")
+
+    def get_replicas(self) -> list[dict]:
+        """Get all replicas for DR monitoring."""
+        return self._get_paginated("/api/v1/replicas")
+
+    def get_config_backup(self) -> dict:
+        """Get configuration backup status.
+
+        Returns config backup settings including:
+        - isEnabled: Whether config backup is enabled
+        - lastSuccessfulBackup: Last successful backup time
+        - encryption: Encryption settings
+        - restorePointsToKeep: Number of restore points
+        """
+        return self._get("/api/v1/configBackup")
+
+    def get_security_best_practices(self) -> list[dict]:
+        """Get security analyzer best practices results.
+
+        Returns list of best practice checks with compliance status.
+        """
+        return self._get_paginated("/api/v1/securityAnalyzer/bestPractices")
 
     def get_backup_objects(self) -> list[dict]:
         """Get all backup objects (VMs, agents, etc.)."""
@@ -943,7 +968,7 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--sections",
         nargs="*",
-        default=["jobs", "repositories", "proxies", "managed_servers", "license", "server", "scaleout_repositories", "wan_accelerators"],
+        default=["jobs", "repositories", "proxies", "managed_servers", "license", "server", "scaleout_repositories", "wan_accelerators", "replicas", "config_backup", "security"],
         help="Sections to collect (default: all sections)"
     )
     parser.add_argument(
@@ -1250,6 +1275,48 @@ def main() -> int:
                     output_section("wan_accelerators", wan_accelerators, redactor, timestamp, cache_interval)
             except VeeamAPIError as e:
                 sys.stderr.write(f"Warning: Failed to fetch wan_accelerators: {e}\n")
+
+        if "replicas" in args.sections:
+            try:
+                cache_interval = cache_config.replicas
+                cached = load_cached_section(hostname_for_cache, "replicas", cache_interval) if cache_interval else None
+                if cached:
+                    replicas, timestamp = cached
+                    output_section("replicas", replicas, redactor, timestamp, cache_interval)
+                else:
+                    replicas = api.get_replicas()
+                    timestamp = store_cached_section(hostname_for_cache, "replicas", replicas) if cache_interval else None
+                    output_section("replicas", replicas, redactor, timestamp, cache_interval)
+            except VeeamAPIError as e:
+                sys.stderr.write(f"Warning: Failed to fetch replicas: {e}\n")
+
+        if "config_backup" in args.sections:
+            try:
+                cache_interval = cache_config.config_backup
+                cached = load_cached_section(hostname_for_cache, "config_backup", cache_interval) if cache_interval else None
+                if cached:
+                    config_backup, timestamp = cached
+                    output_section("config_backup", config_backup, redactor, timestamp, cache_interval)
+                else:
+                    config_backup = api.get_config_backup()
+                    timestamp = store_cached_section(hostname_for_cache, "config_backup", config_backup) if cache_interval else None
+                    output_section("config_backup", config_backup, redactor, timestamp, cache_interval)
+            except VeeamAPIError as e:
+                sys.stderr.write(f"Warning: Failed to fetch config_backup: {e}\n")
+
+        if "security" in args.sections:
+            try:
+                cache_interval = cache_config.security
+                cached = load_cached_section(hostname_for_cache, "security", cache_interval) if cache_interval else None
+                if cached:
+                    security, timestamp = cached
+                    output_section("security", security, redactor, timestamp, cache_interval)
+                else:
+                    security = api.get_security_best_practices()
+                    timestamp = store_cached_section(hostname_for_cache, "security", security) if cache_interval else None
+                    output_section("security", security, redactor, timestamp, cache_interval)
+            except VeeamAPIError as e:
+                sys.stderr.write(f"Warning: Failed to fetch security: {e}\n")
 
     except VeeamAPIError as e:
         # Authentication or critical API error

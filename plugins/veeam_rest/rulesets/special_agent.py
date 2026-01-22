@@ -125,6 +125,18 @@ def _parameter_form() -> Dictionary:
                             name="wan_accelerators",
                             title=Title("WAN Accelerators"),
                         ),
+                        MultipleChoiceElement(
+                            name="replicas",
+                            title=Title("Replicas"),
+                        ),
+                        MultipleChoiceElement(
+                            name="config_backup",
+                            title=Title("Configuration Backup"),
+                        ),
+                        MultipleChoiceElement(
+                            name="security",
+                            title=Title("Security Compliance"),
+                        ),
                     ],
                     prefill=DefaultValue([
                         "jobs",
@@ -135,6 +147,9 @@ def _parameter_form() -> Dictionary:
                         "server",
                         "scaleout_repositories",
                         "wan_accelerators",
+                        "replicas",
+                        "config_backup",
+                        "security",
                     ]),
                 ),
             ),
@@ -267,6 +282,33 @@ def _parameter_form() -> Dictionary:
                             required=False,
                             parameter_form=TimeSpan(
                                 title=Title("WAN Accelerators"),
+                                help_text=Help("Default: 1 hour"),
+                                displayed_magnitudes=[TimeMagnitude.MINUTE, TimeMagnitude.HOUR],
+                                prefill=DefaultValue(3600),
+                            ),
+                        ),
+                        "replicas": DictElement(
+                            required=False,
+                            parameter_form=TimeSpan(
+                                title=Title("Replicas"),
+                                help_text=Help("Default: 5 minutes"),
+                                displayed_magnitudes=[TimeMagnitude.MINUTE, TimeMagnitude.HOUR],
+                                prefill=DefaultValue(300),
+                            ),
+                        ),
+                        "config_backup": DictElement(
+                            required=False,
+                            parameter_form=TimeSpan(
+                                title=Title("Configuration Backup"),
+                                help_text=Help("Default: 1 hour"),
+                                displayed_magnitudes=[TimeMagnitude.MINUTE, TimeMagnitude.HOUR],
+                                prefill=DefaultValue(3600),
+                            ),
+                        ),
+                        "security": DictElement(
+                            required=False,
+                            parameter_form=TimeSpan(
+                                title=Title("Security Compliance"),
                                 help_text=Help("Default: 1 hour"),
                                 displayed_magnitudes=[TimeMagnitude.MINUTE, TimeMagnitude.HOUR],
                                 prefill=DefaultValue(3600),

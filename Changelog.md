@@ -2,6 +2,41 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.57] - 2026-01-22
+
+### Added
+- **Replicas Monitoring**: New `Veeam Replica %s` service for disaster recovery monitoring
+  - New section `replicas` in special agent
+  - API endpoint: `/api/v1/replicas`
+  - Shows platform (vSphere/Hyper-V), type, and job association
+  - Cache interval: 5 minutes (default)
+
+- **Configuration Backup Monitoring**: New `Veeam Config Backup` service
+  - New section `config_backup` in special agent
+  - API endpoint: `/api/v1/configBackup`
+  - CRITICAL if configuration backup is disabled
+  - WARN/CRIT thresholds for backup age (default: 7/14 days)
+  - Shows encryption status and restore points to keep
+  - Cache interval: 1 hour (default)
+  - New ruleset "Veeam Configuration Backup" for threshold configuration
+
+- **Security Compliance Monitoring**: New `Veeam Security Compliance` service
+  - New section `security` in special agent
+  - API endpoint: `/api/v1/securityAnalyzer/bestPractices`
+  - Counts passed/failed/suppressed security checks
+  - WARN/CRIT thresholds for failed checks (default: 1/5)
+  - Lists failed check names in service details
+  - Cache interval: 1 hour (default)
+  - New ruleset "Veeam Security Compliance" for threshold configuration
+
+### Changed
+- Default sections now include all 11 sections (added: replicas, config_backup, security)
+
+### New Files
+- `agent_based/veeam_rest_replicas.py`
+- `agent_based/veeam_rest_config_backup.py`
+- `agent_based/veeam_rest_security.py`
+
 ## [0.0.56] - 2026-01-22
 
 ### Added

@@ -650,3 +650,98 @@ rule_spec_veeam_rest_backup = CheckParameters(
     parameter_form=_veeam_rest_backup_form,
     condition=HostAndItemCondition(item_title=Title("Object name")),
 )
+
+
+# =============================================================================
+# VEEAM CONFIGURATION BACKUP
+# =============================================================================
+
+def _veeam_rest_config_backup_form() -> Dictionary:
+    return Dictionary(
+        title=Title("Veeam Configuration Backup Parameters"),
+        help_text=Help(
+            "Configure thresholds for Veeam configuration backup monitoring. "
+            "Configuration backup is critical for disaster recovery."
+        ),
+        elements={
+            "backup_age_warn": DictElement(
+                required=False,
+                parameter_form=Integer(
+                    title=Title("Backup age warning"),
+                    help_text=Help(
+                        "Alert with WARNING if the last configuration backup is older "
+                        "than this threshold."
+                    ),
+                    unit_symbol="days",
+                    prefill=DefaultValue(7),
+                ),
+            ),
+            "backup_age_crit": DictElement(
+                required=False,
+                parameter_form=Integer(
+                    title=Title("Backup age critical"),
+                    help_text=Help(
+                        "Alert with CRITICAL if the last configuration backup is older "
+                        "than this threshold."
+                    ),
+                    unit_symbol="days",
+                    prefill=DefaultValue(14),
+                ),
+            ),
+        },
+    )
+
+
+rule_spec_veeam_rest_config_backup = CheckParameters(
+    name="veeam_rest_config_backup",
+    title=Title("Veeam Configuration Backup"),
+    topic=Topic.APPLICATIONS,
+    parameter_form=_veeam_rest_config_backup_form,
+    condition=HostCondition(),  # Singleton service - no item
+)
+
+
+# =============================================================================
+# VEEAM SECURITY COMPLIANCE
+# =============================================================================
+
+def _veeam_rest_security_form() -> Dictionary:
+    return Dictionary(
+        title=Title("Veeam Security Compliance Parameters"),
+        help_text=Help(
+            "Configure thresholds for security best practice violations."
+        ),
+        elements={
+            "failed_warn": DictElement(
+                required=False,
+                parameter_form=Integer(
+                    title=Title("Failed checks warning threshold"),
+                    help_text=Help(
+                        "Alert with WARNING if the number of failed security checks "
+                        "equals or exceeds this threshold."
+                    ),
+                    prefill=DefaultValue(1),
+                ),
+            ),
+            "failed_crit": DictElement(
+                required=False,
+                parameter_form=Integer(
+                    title=Title("Failed checks critical threshold"),
+                    help_text=Help(
+                        "Alert with CRITICAL if the number of failed security checks "
+                        "equals or exceeds this threshold."
+                    ),
+                    prefill=DefaultValue(5),
+                ),
+            ),
+        },
+    )
+
+
+rule_spec_veeam_rest_security = CheckParameters(
+    name="veeam_rest_security",
+    title=Title("Veeam Security Compliance"),
+    topic=Topic.APPLICATIONS,
+    parameter_form=_veeam_rest_security_form,
+    condition=HostCondition(),  # Singleton service - no item
+)
