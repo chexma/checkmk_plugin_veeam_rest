@@ -32,9 +32,9 @@ Section = list[dict[str, Any]]  # list of best practice checks
 def parse_veeam_rest_security(string_table) -> Section | None:
     """Parse JSON list of best practice checks."""
     data = parse_json_section(string_table)
-    if not data or not isinstance(data, list):
+    if data is None or not isinstance(data, list):
         return None
-    return data if data else None
+    return data  # Empty list [] is valid (Security Analyzer never run)
 
 
 agent_section_veeam_rest_security = AgentSection(
@@ -71,8 +71,12 @@ def check_veeam_rest_security(
     section: Section,
 ) -> CheckResult:
     """Check Veeam security compliance status."""
-    if not section:
+    if section is None:
         yield Result(state=State.UNKNOWN, summary="No data received from agent")
+        return
+
+    if len(section) == 0:
+        yield Result(state=State.OK, summary="Security Analyzer has never been run")
         return
 
     # Count checks by status
@@ -147,7 +151,7 @@ def check_veeam_rest_security(
 
 check_plugin_veeam_rest_security = CheckPlugin(
     name="veeam_rest_security",
-    service_name="Veeam Security Compliance",
+    service_name="Veeam Security and Compliance Analysis",
     discovery_function=discover_veeam_rest_security,
     check_function=check_veeam_rest_security,
     check_default_parameters={
