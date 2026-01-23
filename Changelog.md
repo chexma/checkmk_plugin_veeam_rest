@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.58] - 2026-01-23
+
+### Changed
+- **Security Compliance Service**: Renamed to `Veeam Security and Compliance Analysis`
+- **Security Compliance Check**: Now shows OK with "Security Analyzer has never been run" when no scan has been performed (instead of UNKNOWN)
+
+### Fixed
+- Empty security check list `[]` no longer treated as missing data
+
 ## [0.0.57] - 2026-01-22
 
 ### Added
