@@ -24,6 +24,8 @@ from cmk.agent_based.v2 import (
     render,
 )
 
+from cmk_addons.plugins.veeam_rest.lib import format_datetime
+
 
 # =============================================================================
 # SECTION PARSING
@@ -155,8 +157,11 @@ def check_veeam_rest_config_backup(
             else:
                 summary_parts.append(f"last backup {age_days} days ago")
     else:
+        # Configurable state for no backup (default: WARN)
+        no_backup_state_str = params.get("no_backup_state", "warn")
+        no_backup_state = State.CRIT if no_backup_state_str == "crit" else State.WARN
         yield Result(
-            state=State.WARN,
+            state=no_backup_state,
             summary="No successful backup recorded",
         )
         return
@@ -175,9 +180,10 @@ def check_veeam_rest_config_backup(
     )
 
     if last_backup_time_str:
+        formatted_time = format_datetime(last_backup_time_str) or last_backup_time_str
         yield Result(
             state=State.OK,
-            notice=f"Last successful backup: {last_backup_time_str}",
+            notice=f"Last successful backup: {formatted_time}",
         )
 
     # Repository info

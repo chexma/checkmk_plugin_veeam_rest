@@ -688,6 +688,21 @@ def _veeam_rest_config_backup_form() -> Dictionary:
                     prefill=DefaultValue(14),
                 ),
             ),
+            "no_backup_state": DictElement(
+                required=False,
+                parameter_form=SingleChoice(
+                    title=Title("State when no backup exists"),
+                    help_text=Help(
+                        "State to report when no successful configuration backup has been recorded. "
+                        "Default is WARNING."
+                    ),
+                    elements=[
+                        SingleChoiceElement(name="warn", title=Title("WARNING")),
+                        SingleChoiceElement(name="crit", title=Title("CRITICAL")),
+                    ],
+                    prefill=DefaultValue("warn"),
+                ),
+            ),
         },
     )
 

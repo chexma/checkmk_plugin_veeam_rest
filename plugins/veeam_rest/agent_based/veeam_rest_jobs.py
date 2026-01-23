@@ -6,7 +6,6 @@ Monitors backup and replication job status, last result, and schedule.
 """
 
 from collections.abc import Mapping
-from datetime import datetime
 from typing import Any
 
 from cmk.agent_based.v2 import (
@@ -22,6 +21,7 @@ from cmk.agent_based.v2 import (
 )
 
 from cmk_addons.plugins.veeam_rest.lib import (
+    format_datetime,
     parse_duration_to_seconds,
     parse_json_section,
     parse_rate_to_bytes_per_second,
@@ -166,17 +166,6 @@ STATE_MAP = {
 }
 
 
-def _format_datetime(iso_string: str | None) -> str | None:
-    """Format ISO 8601 datetime to readable format (DD.MM.YYYY HH:MM:SS)."""
-    if not iso_string:
-        return None
-    try:
-        dt = datetime.fromisoformat(iso_string.replace("Z", "+00:00"))
-        return dt.strftime("%d.%m.%Y %H:%M:%S")
-    except (ValueError, TypeError):
-        return iso_string  # Return original if parsing fails
-
-
 def _get_result_state(result: str, params: Mapping[str, Any]) -> State:
     """Get the configured state for a job result."""
     result_states = params.get("result_states", {})
@@ -299,11 +288,11 @@ def check_veeam_rest_jobs(
         yield Result(state=State.OK, notice=f"Backup Server: {backup_server}")
 
     if last_run:
-        last_run_formatted = _format_datetime(last_run) or last_run
+        last_run_formatted = format_datetime(last_run) or last_run
         yield Result(state=State.OK, notice=f"Last Run: {last_run_formatted}")
 
     if next_run:
-        next_run_formatted = _format_datetime(next_run) or next_run
+        next_run_formatted = format_datetime(next_run) or next_run
         yield Result(state=State.OK, notice=f"Next Run: {next_run_formatted}")
 
     if next_run_policy and next_run_policy != "<Not scheduled>":

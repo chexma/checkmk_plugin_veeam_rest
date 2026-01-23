@@ -233,6 +233,26 @@ def format_duration_hms(seconds: int) -> str:
     return f"{hours:02d}:{minutes:02d}:{secs:02d}"
 
 
+def format_datetime(iso_string: str | None) -> str | None:
+    """Format ISO 8601 datetime to readable format (DD.MM.YYYY HH:MM:SS).
+
+    Args:
+        iso_string: ISO 8601 datetime string (e.g., "2025-01-22T10:30:00Z").
+
+    Returns:
+        Formatted datetime string (e.g., "22.01.2025 10:30:00") or original string on error.
+    """
+    if not iso_string:
+        return None
+    try:
+        from datetime import datetime
+
+        dt = datetime.fromisoformat(iso_string.replace("Z", "+00:00"))
+        return dt.strftime("%d.%m.%Y %H:%M:%S")
+    except (ValueError, TypeError):
+        return iso_string  # Return original if parsing fails
+
+
 # =============================================================================
 # BACKUP CHECK HELPERS
 # =============================================================================
@@ -426,7 +446,8 @@ def yield_backup_metrics(
         # Creation time
         creation_time = latest_rp.get("creationTime")
         if creation_time:
-            yield Result(state=State.OK, notice=f"Last backup: {creation_time}")
+            formatted_time = format_datetime(creation_time) or creation_time
+            yield Result(state=State.OK, notice=f"Last backup: {formatted_time}")
 
         # Extra metrics from restore point (only for backup_objects)
         if include_extra_metrics:
