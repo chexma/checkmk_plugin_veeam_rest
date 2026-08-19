@@ -129,6 +129,7 @@ class VeeamRedactor:
         # Names
         "name": "NAME",
         "hostName": "HOST",
+        "jobName": "JOB",
         "repositoryName": "REPO",
         "backupServer": "SERVER",
         "backupServerName": "SERVER",
@@ -260,6 +261,7 @@ class VeeamRestAPI:
         self.verify_ssl = verify_ssl
         self.timeout = timeout
         self.session = requests.Session()
+        self._backup_info_map: dict[str, dict] | None = None
         self._authenticate(username, password)
 
     def _authenticate(self, username: str, password: str) -> None:
@@ -458,6 +460,28 @@ class VeeamRestAPI:
         """
         return self._get_paginated("/api/v1/backups")
 
+    def get_backup_info_map(self) -> dict[str, dict]:
+        """Get a backupId -> backup metadata mapping (cached for the agent run).
+
+        Used to resolve the job that owns a restore point, since restore points
+        carry a `backupId` while backup objects do not (see BackupObjectModel).
+
+        Returns:
+            Dict mapping backup ID to {jobName, jobType, repositoryName}.
+        """
+        if self._backup_info_map is None:
+            self._backup_info_map = {
+                b["id"]: {
+                    "jobName": b.get("name"),
+                    "jobType": b.get("jobType"),
+                    "repositoryName": b.get("repositoryName"),
+                }
+                for b in self.get_backups()
+                if b.get("id")
+            }
+            logger.debug("Built backup info mapping for %d backups", len(self._backup_info_map))
+        return self._backup_info_map
+
     def get_backup_objects_for_backup(self, backup_id: str) -> list[dict]:
         """Get backup objects for a specific backup."""
         return self._get_paginated(f"/api/v1/backups/{backup_id}/objects")
@@ -482,11 +506,10 @@ class VeeamRestAPI:
         return [t for t in all_tasks if t.get("sessionId") == session_id]
 
     def get_backup_objects_with_job_info(self, created_after: str | None = None) -> list[dict]:
-        """Get all backup objects enriched with job name and warning info.
+        """Get all backup objects enriched with warning info.
 
         Uses bulk endpoints and joins in Python for performance:
         - 1 call to /api/v1/backupObjects (all objects)
-        - 1 call to /api/v1/backups (job name mapping)
         - 1 call to /api/v1/jobs/states (for warning detection)
         - 1 call to /api/v1/taskSessions (for warning jobs, filtered by time)
         Instead of 34+ individual calls per backup.
@@ -497,18 +520,14 @@ class VeeamRestAPI:
         For jobs with Warning/Failed result, task sessions are checked to identify
         which specific VMs had warnings/errors (e.g., VSS failures).
 
+        The owning job is NOT resolved here: backup objects carry no backupId
+        (BackupObjectModel has no such field). enrich_backup_objects() adds
+        jobName/jobType/repositoryName via the object's latest restore point.
+
         Args:
             created_after: Optional ISO timestamp to filter task sessions.
                           Only task sessions created after this time are fetched.
         """
-        # Fetch all backups to build backupId -> jobName mapping (1 API call)
-        backups = self.get_backups()
-        backup_info = {
-            b.get("id"): {"jobName": b.get("name"), "jobType": b.get("jobType")}
-            for b in backups if b.get("id")
-        }
-        logger.debug("Built backup info mapping for %d backups", len(backup_info))
-
         # Fetch job states to identify warning/failed jobs and get session IDs
         jobs = self.get_job_states()
         job_by_name: dict[str, dict] = {}
@@ -592,13 +611,6 @@ class VeeamRestAPI:
             obj_name_raw = obj.get("name", "")
             if obj_name_raw.lower().startswith("outdated_"):
                 continue
-
-            # Add job info from backup mapping (if object has backupId)
-            backup_id = obj.get("backupId")
-            if backup_id and backup_id in backup_info:
-                obj["jobName"] = backup_info[backup_id]["jobName"]
-                if backup_info[backup_id]["jobType"]:
-                    obj["jobType"] = backup_info[backup_id]["jobType"]
 
             # Add warning info if this VM has a warning/failed task result
             obj_name = obj.get("name", "").lower()
@@ -808,6 +820,7 @@ def enrich_backup_objects(
         - latestRestorePoint: Most recent restore point with malware status
         - taskData: Latest task session with duration and progress
         - backupAgeSeconds: Seconds since last backup (from restore point)
+        - jobName/jobType/repositoryName: Backup that owns the latest restore point
 
     Note:
         Task sessions are only available for VM-based backups (vSphere, Hyper-V).
@@ -815,6 +828,14 @@ def enrich_backup_objects(
         have restore points for backup age calculation.
     """
     now = datetime.now(timezone.utc)
+
+    # backupId -> {jobName, jobType, repositoryName}; cached, so no extra API call
+    # when get_backup_objects_with_job_info() already built it.
+    try:
+        backup_info = api.get_backup_info_map()
+    except VeeamAPIError as e:
+        logger.warning("Failed to fetch backups for job name mapping: %s", e)
+        backup_info = {}
 
     # Build task lookup by name (lowercase for case-insensitive matching)
     # Keep only the most recent task per object name
@@ -874,6 +895,18 @@ def enrich_backup_objects(
 
         if latest:
             obj["latestRestorePoint"] = latest
+
+            # Resolve the backup (and therefore the job) that created this restore
+            # point. Backup objects have no backupId of their own, so the latest
+            # restore point is the only link between object and job.
+            info = backup_info.get(latest.get("backupId") or "")
+            if info:
+                if info.get("jobName"):
+                    obj["jobName"] = info["jobName"]
+                if info.get("jobType"):
+                    obj["jobType"] = info["jobType"]
+                if info.get("repositoryName"):
+                    obj["repositoryName"] = info["repositoryName"]
 
             # Calculate backup age
             creation_time = latest.get("creationTime")

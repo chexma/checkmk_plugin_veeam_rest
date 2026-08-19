@@ -96,8 +96,8 @@ def check_veeam_rest_vm_backup(
     summary += f", Type: {type_display}"
     if platform:
         summary += f" ({platform})"
-    summary += f", Restore points: {restore_point_count}"
 
+    # Restore point count is rendered by yield_backup_metrics() below
     yield Result(state=result_state, summary=summary)
 
     # Yield common backup metrics and checks (restore points, age, task data, malware, etc.)

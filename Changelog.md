@@ -2,6 +2,38 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+- **Job name in backup services**: `jobName` was never populated, so `Veeam Backup %s`
+  services never showed the owning job. The mapping used a `backupId` field on backup
+  objects, which `/api/v1/backupObjects` does not provide (see `BackupObjectModel`).
+  The job is now resolved through the `backupId` of the object's latest restore point,
+  which also yields `jobType` and `repositoryName` - without any additional API call.
+- **Duplicated restore point count**: with restore point thresholds configured, the
+  count appeared twice in the service summary
+  (`Restore points: 60, Restore points: 60 (warn/crit at 9/10)`). Lower and upper
+  levels are now evaluated in a single `check_levels()` call and the count is rendered
+  exactly once. The `veeam_rest_backup_restore_points` metric now carries the
+  configured levels, so thresholds show up in the graph.
+- **Redaction**: `jobName` is added to the redacted fields of the special agent's
+  `--redact` mode (it now actually carries data).
+
+### Added
+- **Debug Script**: `debug_veeam_api.py --analyze-restore-points <name>` breaks down
+  the restore points of a backup object by backup chain (job name, job type
+  `[PRIMARY]`/`[COPY]`, repository, count, oldest/newest point, point types) and
+  compares the sum against the `restorePointsCount` the check reports. This explains
+  why the restore point count of a service can be much higher than the retention
+  configured on the backup job. Accepts several names (repeated option or
+  comma-separated) and `all` for a server-wide overview of objects that span more than
+  one chain. Skips all other tests.
+
+### Documentation
+- README/Installation: explain that `restorePointsCount` covers all backup chains of an
+  object (primary + backup copy + GFS + leftovers of deleted jobs) and that tape data is
+  not exposed by the REST API at all.
+
 ## [0.0.58] - 2026-01-23
 
 ### Changed

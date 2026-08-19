@@ -14,6 +14,7 @@ Tests performed:
 5. License and server information
 6. Backup objects and restore points
 7. Performance comparison (bulk vs per-object API calls)
+8. Restore point breakdown per backup chain (--analyze-restore-points)
 
 Additionally shows timing summary for all API calls to help identify
 performance bottlenecks.
@@ -22,6 +23,8 @@ Usage:
     python3 debug_veeam_api.py --host 192.168.1.1 --user 'DOMAIN\\admin'
     python3 debug_veeam_api.py --host veeam.local --user admin@domain.com --redact
     python3 debug_veeam_api.py --host veeam.local --user admin --perf-objects 50
+    python3 debug_veeam_api.py --host veeam.local --user admin --analyze-restore-points HOST1
+    python3 debug_veeam_api.py --host veeam.local --user admin --analyze-restore-points all
 
 The password will be prompted securely (hidden input).
 """
@@ -684,6 +687,276 @@ def run_performance_test(
 
 
 # =============================================================================
+# Restore Point Analysis
+# =============================================================================
+
+# Job types that produce a secondary copy of an existing backup chain.
+# Their restore points are counted by restorePointsCount just like primary ones.
+COPY_JOB_TYPES = {
+    "BackupCopy",
+    "LegacyBackupCopy",
+    "FileBackupCopy",
+    "EntraIDTenantBackupCopy",
+}
+
+
+def _fmt_time(value: Optional[str]) -> str:
+    """Shorten an ISO timestamp for table output."""
+    if not value:
+        return "unknown"
+    return value.replace("T", " ")[:19]
+
+
+def _describe_chain(backup: Optional[dict], backup_id: Optional[str]) -> Tuple[str, str, str]:
+    """Return (job name, job type, repository) for a backup ID."""
+    if not backup:
+        return (f"<unknown backup {backup_id}>", "Unknown", "unknown")
+    return (
+        backup.get("name") or "<unnamed>",
+        backup.get("jobType") or "Unknown",
+        backup.get("repositoryName") or "unknown",
+    )
+
+
+def _print_chain_breakdown(
+    points: List[dict],
+    backups_by_id: Dict[str, dict],
+    reported_count: Optional[int],
+    indent: str = "    ",
+) -> None:
+    """Print restore points grouped by backup chain and compare with the API count."""
+    by_backup: Dict[str, List[dict]] = {}
+    for point in points:
+        by_backup.setdefault(point.get("backupId") or "", []).append(point)
+
+    primary_total = 0
+    copy_total = 0
+
+    # Primary chains first (their retention is what an admin configured), then by size
+    chains = sorted(
+        by_backup.items(),
+        key=lambda kv: (
+            _describe_chain(backups_by_id.get(kv[0]), kv[0])[1] in COPY_JOB_TYPES,
+            -len(kv[1]),
+        ),
+    )
+    detail_indent = indent + " " * 11
+
+    for backup_id, chain_points in chains:
+        job_name, job_type, repo_name = _describe_chain(backups_by_id.get(backup_id), backup_id)
+        is_copy = job_type in COPY_JOB_TYPES
+        if is_copy:
+            copy_total += len(chain_points)
+        else:
+            primary_total += len(chain_points)
+
+        times = sorted(p.get("creationTime") or "" for p in chain_points)
+        type_counts: Dict[str, int] = {}
+        for point in chain_points:
+            point_type = point.get("type", "Unknown")
+            type_counts[point_type] = type_counts.get(point_type, 0) + 1
+        types = ", ".join(f"{t}: {c}" for t, c in sorted(type_counts.items(), key=lambda x: -x[1]))
+
+        # Pad the tag before colorizing - ANSI codes would break the field width
+        tag = "[COPY]" if is_copy else "[PRIMARY]"
+        color = Colors.YELLOW if is_copy else Colors.GREEN
+        tag_padded = f"{color}{tag}{Colors.END}{' ' * (9 - len(tag))}"
+
+        print(f"{indent}{tag_padded} {Colors.BOLD}{len(chain_points):>5}{Colors.END} points  {redact(job_name)}")
+        print(f"{detail_indent}Job type: {job_type}, repository: {redact(repo_name)}")
+        print(f"{detail_indent}Oldest: {_fmt_time(times[0])}, newest: {_fmt_time(times[-1])}")
+        print(f"{detail_indent}Types: {types}")
+
+    total = len(points)
+    print(f"\n{indent}{Colors.BOLD}Sum over all chains: {total}{Colors.END}"
+          f"  (primary: {primary_total}, backup copy: {copy_total})")
+
+    if reported_count is None:
+        return
+
+    print(f"{indent}restorePointsCount reported by /api/v1/backupObjects: {reported_count}")
+    if reported_count == total:
+        print(f"{indent}{ok('Matches - the check value is the sum over ALL backup chains')}")
+    else:
+        delta = reported_count - total
+        msg = (
+            f"Differs by {delta} - restore points may exist in chains that are not "
+            "reachable via this object (e.g. imported backups)"
+        )
+        print(f"{indent}{warn(msg)}")
+
+    if len(chains) > 1:
+        msg = (
+            f"This object is part of {len(chains)} backup chains - that is why the count "
+            "exceeds the retention of a single job"
+        )
+        print(f"{indent}{info(msg)}")
+
+
+def analyze_restore_points_for_names(
+    session: requests.Session,
+    base_url: str,
+    token: str,
+    verify_ssl: bool,
+    timing: TimingTracker,
+    names: List[str],
+) -> None:
+    """Break down the restore points of specific backup objects by backup chain.
+
+    Explains why `restorePointsCount` (and therefore the Checkmk service) can be
+    much higher than the retention configured on the primary backup job.
+    """
+    print_header("RESTORE POINT ANALYSIS")
+
+    backup_objects, bo_time, bo_calls = api_get_paginated(
+        session, base_url, "backupObjects", token, verify_ssl
+    )
+    timing.add("backupObjects (paginated)", bo_time, bo_calls)
+    print(f"  {ok(f'Fetched {len(backup_objects)} backup objects ({bo_time:.0f}ms)')}")
+
+    backups, b_time, b_calls = api_get_paginated(session, base_url, "backups", token, verify_ssl)
+    timing.add("backups (paginated)", b_time, b_calls)
+    backups_by_id = {b["id"]: b for b in backups if b.get("id")}
+    print(f"  {ok(f'Fetched {len(backups)} backups ({b_time:.0f}ms)')}")
+
+    if REDACT_ENABLED:
+        for backup in backups:
+            for key in ("name", "repositoryName"):
+                value = backup.get(key)
+                if value and value not in REDACT_VALUES:
+                    REDACT_VALUES.append(value)
+
+    for name in names:
+        print_subheader(f"Object: {name}")
+
+        needle = name.lower()
+        matches = [o for o in backup_objects if (o.get("name") or "").lower() == needle]
+        if not matches:
+            matches = [o for o in backup_objects if needle in (o.get("name") or "").lower()]
+            if matches:
+                print(f"  {info(f'No exact name match - using {len(matches)} substring match(es)')}")
+
+        if not matches:
+            print(f"  {fail(f'No backup object found for {name!r}')}")
+            similar = [
+                str(o.get("name")) for o in backup_objects
+                if o.get("name") and needle[:4] and needle[:4] in str(o["name"]).lower()
+            ]
+            if similar:
+                print(f"  Similar names: {', '.join(redact(s) for s in similar[:10])}")
+            continue
+
+        for obj in matches:
+            object_id = obj.get("id")
+            obj_name = obj.get("name", "Unknown")
+            reported_count = obj.get("restorePointsCount")
+
+            print(f"\n  {Colors.BOLD}{redact(obj_name)}{Colors.END}")
+            print(f"    Object ID: {object_id}")
+            print(f"    Platform: {obj.get('platformName', 'Unknown')}, type: {obj.get('type', 'Unknown')}")
+            if obj.get("path"):
+                print(f"    Path: {redact(obj['path'])}")
+            print(f"    Last run failed: {obj.get('lastRunFailed', False)}")
+
+            if not object_id:
+                print(f"    {fail('Object has no ID - cannot fetch restore points')}")
+                continue
+
+            points, rp_time, rp_calls = api_get_paginated(
+                session, base_url, f"backupObjects/{object_id}/restorePoints",
+                token, verify_ssl
+            )
+            timing.add(f"restorePoints for {redact(obj_name)}", rp_time, rp_calls)
+            print(f"    Fetched {len(points)} restore points in {rp_time:.0f}ms ({rp_calls} calls)\n")
+
+            if not points:
+                print(f"    {warn('No restore points returned for this object')}")
+                continue
+
+            _print_chain_breakdown(points, backups_by_id, reported_count)
+
+    note = (
+        "Note: the REST API v1.3 exposes no tape data at all - restore points "
+        "stored on tape are never part of these numbers."
+    )
+    print(f"\n  {info(note)}")
+
+
+def analyze_restore_points_overview(
+    session: requests.Session,
+    base_url: str,
+    token: str,
+    verify_ssl: bool,
+    timing: TimingTracker,
+    top: int = 20,
+) -> None:
+    """Show which backup objects span more than one backup chain.
+
+    Uses a single unfiltered /api/v1/restorePoints fetch instead of one call per
+    object. This can take a while on large servers (10k+ restore points).
+    """
+    print_header("RESTORE POINT ANALYSIS (ALL OBJECTS)")
+
+    backups, b_time, b_calls = api_get_paginated(session, base_url, "backups", token, verify_ssl)
+    timing.add("backups (paginated)", b_time, b_calls)
+    backups_by_id = {b["id"]: b for b in backups if b.get("id")}
+    print(f"  {ok(f'Fetched {len(backups)} backups ({b_time:.0f}ms)')}")
+
+    if REDACT_ENABLED:
+        for backup in backups:
+            for key in ("name", "repositoryName"):
+                value = backup.get(key)
+                if value and value not in REDACT_VALUES:
+                    REDACT_VALUES.append(value)
+
+    print(f"  {info('Fetching ALL restore points without time filter - this may take a minute')}")
+    points, rp_time, rp_calls = api_get_paginated(
+        session, base_url, "restorePoints", token, verify_ssl
+    )
+    timing.add("restorePoints (all, unfiltered)", rp_time, rp_calls)
+    print(f"  {ok(f'Fetched {len(points)} restore points in {rp_time / 1000:.1f}s ({rp_calls} calls)')}")
+
+    by_object: Dict[str, Dict[str, int]] = {}
+    for point in points:
+        obj_name = point.get("name") or "<unnamed>"
+        backup_id = point.get("backupId") or ""
+        chains = by_object.setdefault(obj_name, {})
+        chains[backup_id] = chains.get(backup_id, 0) + 1
+
+    multi = {n: c for n, c in by_object.items() if len(c) > 1}
+    print(f"\n  {Colors.BOLD}Objects with restore points: {len(by_object)}{Colors.END}")
+    print(f"  {Colors.BOLD}Objects spanning more than one backup chain: {len(multi)}{Colors.END}")
+
+    if not multi:
+        msg = (
+            "Every object lives in exactly one chain - restorePointsCount equals "
+            "the retention of its job"
+        )
+        print(f"\n  {ok(msg)}")
+        return
+
+    print_subheader(f"Top {top} objects by total restore point count")
+    ranked = sorted(by_object.items(), key=lambda kv: -sum(kv[1].values()))
+    for obj_name, chains in ranked[:top]:
+        total = sum(chains.values())
+        parts = []
+        for backup_id, count in sorted(chains.items(), key=lambda kv: -kv[1]):
+            job_name, job_type, _ = _describe_chain(backups_by_id.get(backup_id), backup_id)
+            tag = "COPY" if job_type in COPY_JOB_TYPES else "PRIMARY"
+            parts.append(f"{count}x {redact(job_name)} [{tag}]")
+        flag = f"{Colors.YELLOW}!{Colors.END}" if len(chains) > 1 else " "
+        print(f"  {flag} {total:>5}  {redact(obj_name)}")
+        for part in parts:
+            print(f"           - {part}")
+
+    note = (
+        "Objects marked with ! are counted across several chains - their "
+        "restorePointsCount exceeds any single job retention."
+    )
+    print(f"\n  {info(note)}")
+
+
+# =============================================================================
 # Main Function
 # =============================================================================
 
@@ -698,6 +971,8 @@ Examples:
     python3 debug_veeam_api.py --host veeam.local --user admin@domain.com --no-cert-check
     python3 debug_veeam_api.py --host 192.168.1.1 --user Administrator --redact
     python3 debug_veeam_api.py --host veeam.local --user admin --perf-objects 50
+    python3 debug_veeam_api.py --host veeam.local --user admin --analyze-restore-points HOST1,HOST2
+    python3 debug_veeam_api.py --host veeam.local --user admin --analyze-restore-points all
 
 The password will be prompted securely (hidden input).
         """,
@@ -724,6 +999,19 @@ The password will be prompted securely (hidden input).
         type=int,
         default=7,
         help="Only fetch restore points from the last N days (default: 7, 0=all)",
+    )
+    parser.add_argument(
+        "--analyze-restore-points",
+        metavar="NAME",
+        action="append",
+        help=(
+            "Break down the restore points of a backup object by backup chain and show "
+            "which job/repository each point belongs to. Explains why the restore point "
+            "count of a Checkmk service can exceed the retention of the backup job. "
+            "Repeat the option or pass a comma-separated list for several objects. "
+            "Use 'all' for a server-wide overview of objects spanning multiple chains. "
+            "Skips all other tests."
+        ),
     )
 
     args = parser.parse_args()
@@ -801,6 +1089,31 @@ The password will be prompted securely (hidden input).
         results.print_summary()
         timing.print_summary()
         return 1
+
+    # =========================================================================
+    # RESTORE POINT ANALYSIS (skips the remaining tests)
+    # =========================================================================
+    if args.analyze_restore_points:
+        names: List[str] = []
+        for entry in args.analyze_restore_points:
+            names.extend(n.strip() for n in entry.split(",") if n.strip())
+
+        if REDACT_ENABLED:
+            REDACT_VALUES.extend(n for n in names if n not in REDACT_VALUES)
+
+        if any(n.lower() == "all" for n in names):
+            analyze_restore_points_overview(session, base_url, token, verify_ssl, timing)
+            names = [n for n in names if n.lower() != "all"]
+
+        if names:
+            analyze_restore_points_for_names(
+                session, base_url, token, verify_ssl, timing, names
+            )
+
+        timing.print_summary()
+        print()
+        session.close()
+        return 0
 
     # =========================================================================
     # TEST 4: Server Information

@@ -316,31 +316,30 @@ def yield_backup_metrics(
         Result and Metric objects for the check.
     """
     # --- Restore Points Metrics and Thresholds ---
-    yield Metric("veeam_rest_backup_restore_points", restore_point_count)
-
-    # Check minimum restore points
+    # Lower and upper levels are evaluated in a single check_levels() call so the
+    # count is rendered exactly once, no matter how many thresholds are configured.
+    # The calling check plugins must not add the count to their summary themselves.
     min_warn = params.get("restore_points_min_warn")
     min_crit = params.get("restore_points_min_crit")
-    if min_warn is not None and min_crit is not None:
-        yield from check_levels(
-            restore_point_count,
-            levels_lower=("fixed", (min_warn, min_crit)),
-            render_func=lambda x: str(int(x)),
-            label="Restore points",
-            notice_only=True,
-        )
-
-    # Check maximum restore points
     max_warn = params.get("restore_points_max_warn")
     max_crit = params.get("restore_points_max_crit")
-    if max_warn is not None and max_crit is not None:
-        yield from check_levels(
-            restore_point_count,
-            levels_upper=("fixed", (max_warn, max_crit)),
-            render_func=lambda x: str(int(x)),
-            label="Restore points",
-            notice_only=True,
-        )
+
+    yield from check_levels(
+        restore_point_count,
+        levels_lower=(
+            ("fixed", (min_warn, min_crit))
+            if min_warn is not None and min_crit is not None
+            else None
+        ),
+        levels_upper=(
+            ("fixed", (max_warn, max_crit))
+            if max_warn is not None and max_crit is not None
+            else None
+        ),
+        metric_name="veeam_rest_backup_restore_points",
+        render_func=lambda x: str(int(x)),
+        label="Restore points",
+    )
 
     # --- Warning Info from Task Sessions ---
     warning_info = data.get("warningInfo")

@@ -262,6 +262,34 @@ Enable "Disable SSL certificate verification" in the special agent rule, or inst
 3. Run discovery on the VM hosts, not just the Veeam server
 4. Use the piggyback translation rule to match hostnames if different in veeam and checkmk
 
+### Restore point count higher than the job retention
+
+The `Restore points` value of a `Veeam Backup ...` service comes from the
+`restorePointsCount` field of `/api/v1/backupObjects`. Veeam reports this **per object
+across all backup chains on the server**, not per job. A VM that is additionally
+protected by a backup copy job, has GFS (weekly/monthly/yearly) points, or still has
+backups of a previously deleted job on the repository, therefore shows far more restore
+points than the retention of its primary job.
+
+Use the debug script to see exactly which chain contributes how many points:
+
+```bash
+# Break down a single object
+python3 debug_veeam_api.py --host veeam-server --user 'DOMAIN\admin' \
+    --no-cert-check --analyze-restore-points MYSERVER
+
+# Server-wide overview: which objects live in more than one chain
+python3 debug_veeam_api.py --host veeam-server --user 'DOMAIN\admin' \
+    --no-cert-check --analyze-restore-points all
+```
+
+The output lists each backup chain with its job name, job type (`[PRIMARY]` or
+`[COPY]`), repository, point count and the oldest/newest point, and compares the sum
+against the value the check reports.
+
+Restore points stored on **tape are never included** - the REST API v1.3 exposes no
+tape data at all.
+
 ## Performance Tuning
 
 ### Fetch Data From Last

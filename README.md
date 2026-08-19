@@ -77,6 +77,17 @@ See: [Veeam Forums Discussion](https://forums.veeam.com/post561632.html#p561632)
 The Veeam B&R REST API currently lacks informations about Tape Jobs.
 This will also be added in a future release.
 
+### Restore Point Counts Span All Backup Chains
+
+The `Restore points` value reported per VM/object is Veeam's own `restorePointsCount`
+from `/api/v1/backupObjects`. It counts **all** restore points of that object across
+every backup chain on the server - primary job, backup copy jobs, GFS points and
+leftover backups of deleted jobs. It is therefore not comparable to the retention of a
+single job. Tape is never included (the REST API exposes no tape data).
+
+Run `debug_veeam_api.py --analyze-restore-points <name>` to see the breakdown per
+backup chain.
+
 ## Contributors
 
 - [47k](https://github.com/47k) - Thanks for extensive testing!
