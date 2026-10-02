@@ -2,9 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [0.0.59] - 2026-10-02
 
 ### Fixed
+- **Duplicate backup objects break piggyback data** (GitHub issues #3, #4): Since VBR 13,
+  `/api/v1/backupObjects` can return the same VM more than once when it is part of
+  several backup chains (e.g. a primary job and a Backup Copy job). In
+  `piggyback-vms` mode this produced two JSON documents in one
+  `veeam_rest_vm_backup` section, the parser failed (`Extra data`) and the
+  `Veeam Backup` services became stale/vanished. Backup objects are now
+  deduplicated by name (case-insensitive), keeping the object with the most restore
+  points - both after fetching and again right before output, so cache files written
+  by older versions are handled as well.
 - **Job name in backup services**: `jobName` was never populated, so `Veeam Backup %s`
   services never showed the owning job. The mapping used a `backupId` field on backup
   objects, which `/api/v1/backupObjects` does not provide (see `BackupObjectModel`).

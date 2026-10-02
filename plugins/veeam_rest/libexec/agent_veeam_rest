@@ -619,6 +619,12 @@ class VeeamRestAPI:
 
             result.append(obj)
 
+        deduplicated = deduplicate_backup_objects(result)
+        if len(deduplicated) != len(result):
+            logger.debug("Removed %d duplicate backup objects (same name in several backup chains)",
+                         len(result) - len(deduplicated))
+        result = deduplicated
+
         logger.info("Enriched %d backup objects with job info", len(result))
         return result
 
@@ -787,6 +793,27 @@ def enrich_task_data(tasks: list[dict], server_name: str, job_type_lookup: dict[
                     task["durationSeconds"] = None
 
     return tasks
+
+
+def deduplicate_backup_objects(objects: list[dict]) -> list[dict]:
+    """Keep exactly one backup object per name (case-insensitive).
+
+    A VM that is part of several backup chains (e.g. a primary job and a
+    backup copy job) can be returned more than once by /api/v1/backupObjects.
+    Services and piggyback hosts are keyed by name, so duplicates would yield
+    two JSON documents in one piggyback section and break parsing.
+    The object with the most restore points wins.
+    """
+    unique_by_name: dict[str, dict] = {}
+    for obj in objects:
+        name = obj.get("name")
+        if not name:
+            continue
+        key = name.lower()
+        existing = unique_by_name.get(key)
+        if existing is None or (obj.get("restorePointsCount") or 0) > (existing.get("restorePointsCount") or 0):
+            unique_by_name[key] = obj
+    return list(unique_by_name.values())
 
 
 def enrich_backup_objects(
@@ -1218,6 +1245,8 @@ def main() -> int:
 
         # Backup objects output based on --backup-mode
         if args.backup_mode and enriched_backup_objects is not None:
+            # Safeguard: cache files written by older versions may still contain duplicates
+            enriched_backup_objects = deduplicate_backup_objects(enriched_backup_objects)
             if args.backup_mode == "piggyback-vms":
                 # Piggyback to monitored VMs
                 output_piggyback_backup_objects(enriched_backup_objects, redactor)
