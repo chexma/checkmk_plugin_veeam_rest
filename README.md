@@ -74,7 +74,7 @@ See: [Veeam Forums Discussion](https://forums.veeam.com/post561632.html#p561632)
 
 ### Tape Job Support
 
-The Veeam B&R REST API currently lacks informations about Tape Jobs.
+The Veeam B&R REST API currently lacks information about Tape Jobs.
 This will also be added in a future release.
 
 ### Restore Point Counts Span All Backup Chains
