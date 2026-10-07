@@ -23,7 +23,7 @@
                                   'veeam_rest/server_side_calls/special_agent.py']},
  'name': 'veeam_rest',
  'title': 'Veeam Backup & Replication via REST API',
- 'version': '0.0.59',
+ 'version': '0.0.60',
  'version.min_required': '2.4.0p1',
  'version.packaged': 'cmk-mkp-tool 1.0.0',
  'version.usable_until': None}
