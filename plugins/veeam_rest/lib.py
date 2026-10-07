@@ -4,7 +4,7 @@ Shared utility functions for Veeam REST monitoring plugin.
 """
 
 import json
-from collections.abc import Iterator, Mapping
+from collections.abc import Mapping
 from typing import Any, TypedDict
 
 from cmk.agent_based.v2 import (

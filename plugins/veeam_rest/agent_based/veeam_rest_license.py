@@ -20,8 +20,6 @@ from cmk.agent_based.v2 import (
     Service,
     State,
     StringTable,
-    check_levels,
-    render,
 )
 
 # =============================================================================
@@ -165,26 +163,21 @@ def check_veeam_rest_license(
             support_exp_crit = params.get("support_expiration_crit", 7)
 
             support_threshold_info = f"(warn/crit below {support_exp_warn}/{support_exp_crit} days)"
+            support_expires = (
+                f"Support contract expires in {support_days_left} days {support_threshold_info}"
+            )
             if support_days_left < 0:
                 yield Result(
                     state=State.WARN,
-                    summary=f"Support contract expired {abs(support_days_left)} days ago {support_threshold_info}",
+                    summary=f"Support contract expired {abs(support_days_left)} days ago "
+                    f"{support_threshold_info}",
                 )
             elif support_days_left <= support_exp_crit:
-                yield Result(
-                    state=State.WARN,
-                    summary=f"Support contract expires in {support_days_left} days {support_threshold_info}",
-                )
+                yield Result(state=State.WARN, summary=support_expires)
             elif support_days_left <= support_exp_warn:
-                yield Result(
-                    state=State.WARN,
-                    summary=f"Support contract expires in {support_days_left} days {support_threshold_info}",
-                )
+                yield Result(state=State.WARN, summary=support_expires)
             else:
-                yield Result(
-                    state=State.OK,
-                    summary=f"Support contract expires in {support_days_left} days {support_threshold_info}",
-                )
+                yield Result(state=State.OK, summary=support_expires)
             yield Metric("veeam_rest_support_days_remaining", support_days_left)
 
     # Check instance license usage
@@ -198,21 +191,16 @@ def check_veeam_rest_license(
             usage_crit = params.get("instance_usage_crit", 95.0)
 
             usage_threshold_info = f"(warn/crit at {usage_warn:.0f}/{usage_crit:.0f}%)"
+            usage_summary = (
+                f"Instance usage: {used:.0f}/{licensed:.0f} ({usage_percent:.1f}%) "
+                f"{usage_threshold_info}"
+            )
             if usage_percent >= usage_crit:
-                yield Result(
-                    state=State.CRIT,
-                    summary=f"Instance usage: {used:.0f}/{licensed:.0f} ({usage_percent:.1f}%) {usage_threshold_info}",
-                )
+                yield Result(state=State.CRIT, summary=usage_summary)
             elif usage_percent >= usage_warn:
-                yield Result(
-                    state=State.WARN,
-                    summary=f"Instance usage: {used:.0f}/{licensed:.0f} ({usage_percent:.1f}%) {usage_threshold_info}",
-                )
+                yield Result(state=State.WARN, summary=usage_summary)
             else:
-                yield Result(
-                    state=State.OK,
-                    summary=f"Instance usage: {used:.0f}/{licensed:.0f} ({usage_percent:.1f}%) {usage_threshold_info}",
-                )
+                yield Result(state=State.OK, summary=usage_summary)
 
             yield Metric("veeam_rest_license_instances_used", used)
             yield Metric("veeam_rest_license_instances_licensed", licensed)
@@ -226,7 +214,6 @@ def check_veeam_rest_license(
         used_sockets = socket_summary.get("usedSocketsNumber", 0)
 
         if licensed_sockets > 0:
-            socket_usage_percent = (used_sockets / licensed_sockets) * 100
             yield Result(
                 state=State.OK,
                 notice=f"Socket usage: {used_sockets}/{licensed_sockets}",
@@ -240,7 +227,6 @@ def check_veeam_rest_license(
         used_capacity_tb = capacity_summary.get("usedCapacityTb", 0)
 
         if licensed_capacity_tb > 0:
-            capacity_usage_percent = (used_capacity_tb / licensed_capacity_tb) * 100
             yield Result(
                 state=State.OK,
                 notice=f"Capacity usage: {used_capacity_tb:.1f}/{licensed_capacity_tb:.1f} TB",

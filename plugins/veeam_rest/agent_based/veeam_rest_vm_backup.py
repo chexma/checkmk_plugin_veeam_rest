@@ -110,7 +110,8 @@ check_plugin_veeam_rest_vm_backup = CheckPlugin(
     discovery_function=discover_veeam_rest_vm_backup,
     check_function=check_veeam_rest_vm_backup,
     check_default_parameters={
-        "malware_status_states": {},  # Use defaults: Clean=OK, Infected=CRIT, Suspicious=WARN, NotScanned=WARN
+        # Use defaults: Clean=OK, Infected=CRIT, Suspicious=WARN, NotScanned=WARN
+        "malware_status_states": {},
     },
     check_ruleset_name="veeam_rest_backup",
 )

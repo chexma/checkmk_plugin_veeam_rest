@@ -15,7 +15,6 @@ from cmk.agent_based.v2 import (
     CheckPlugin,
     CheckResult,
     DiscoveryResult,
-    Metric,
     Result,
     Service,
     State,

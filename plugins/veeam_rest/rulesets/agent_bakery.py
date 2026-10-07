@@ -155,7 +155,8 @@ def _parameter_form() -> Dictionary:
                     title=Title("Cache Interval"),
                     help_text=Help(
                         "How long to cache the plugin output. The plugin will run asynchronously "
-                        "and results will be cached for this duration. Set to 0 for synchronous execution."
+                        "and results will be cached for this duration. "
+                        "Set to 0 for synchronous execution."
                     ),
                     displayed_magnitudes=[TimeMagnitude.SECOND, TimeMagnitude.MINUTE],
                     prefill=DefaultValue(300.0),  # 5 minutes

@@ -233,51 +233,6 @@ rule_spec_veeam_rest_jobs = CheckParameters(
 
 
 # =============================================================================
-# VEEAM TASKS
-# =============================================================================
-
-
-def _veeam_rest_tasks_form() -> Dictionary:
-    return Dictionary(
-        title=Title("Veeam Backup Task Parameters"),
-        elements={
-            "max_backup_age": DictElement(
-                required=False,
-                parameter_form=Integer(
-                    title=Title("Maximum backup age"),
-                    help_text=Help(
-                        "Alert if the last backup of this object is older than this threshold. "
-                        "Value in hours."
-                    ),
-                    unit_symbol="hours",
-                    prefill=DefaultValue(48),
-                ),
-            ),
-            "max_duration": DictElement(
-                required=False,
-                parameter_form=Integer(
-                    title=Title("Maximum backup duration"),
-                    help_text=Help(
-                        "Alert if the backup took longer than this threshold. " "Value in hours."
-                    ),
-                    unit_symbol="hours",
-                    prefill=DefaultValue(8),
-                ),
-            ),
-        },
-    )
-
-
-rule_spec_veeam_rest_tasks = CheckParameters(
-    name="veeam_rest_tasks",
-    title=Title("Veeam Backup Tasks"),
-    topic=Topic.APPLICATIONS,
-    parameter_form=_veeam_rest_tasks_form,
-    condition=HostAndItemCondition(item_title=Title("Object name")),
-)
-
-
-# =============================================================================
 # VEEAM REPOSITORIES
 # =============================================================================
 
@@ -608,7 +563,8 @@ def _veeam_rest_backup_form() -> Dictionary:
                 parameter_form=Integer(
                     title=Title("Minimum restore points (warning)"),
                     help_text=Help(
-                        "Alert with WARNING if the number of restore points is below this threshold."
+                        "Alert with WARNING if the number of restore points is below "
+                        "this threshold."
                     ),
                     prefill=DefaultValue(1),
                 ),
@@ -618,7 +574,8 @@ def _veeam_rest_backup_form() -> Dictionary:
                 parameter_form=Integer(
                     title=Title("Minimum restore points (critical)"),
                     help_text=Help(
-                        "Alert with CRITICAL if the number of restore points is below this threshold."
+                        "Alert with CRITICAL if the number of restore points is below "
+                        "this threshold."
                     ),
                     prefill=DefaultValue(0),
                 ),
@@ -628,7 +585,8 @@ def _veeam_rest_backup_form() -> Dictionary:
                 parameter_form=Integer(
                     title=Title("Maximum restore points (warning)"),
                     help_text=Help(
-                        "Alert with WARNING if the number of restore points exceeds this threshold. "
+                        "Alert with WARNING if the number of restore points exceeds "
+                        "this threshold. "
                         "Useful to detect backup retention issues."
                     ),
                 ),
@@ -638,7 +596,8 @@ def _veeam_rest_backup_form() -> Dictionary:
                 parameter_form=Integer(
                     title=Title("Maximum restore points (critical)"),
                     help_text=Help(
-                        "Alert with CRITICAL if the number of restore points exceeds this threshold."
+                        "Alert with CRITICAL if the number of restore points exceeds "
+                        "this threshold."
                     ),
                 ),
             ),
@@ -698,7 +657,8 @@ def _veeam_rest_config_backup_form() -> Dictionary:
                 parameter_form=SingleChoice(
                     title=Title("State when no backup exists"),
                     help_text=Help(
-                        "State to report when no successful configuration backup has been recorded. "
+                        "State to report when no successful configuration backup has "
+                        "been recorded. "
                         "Default is WARNING."
                     ),
                     elements=[

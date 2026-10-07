@@ -11,6 +11,10 @@ All notable changes to this project will be documented in this file.
 - Development environment moved to the checkmk-plugin-template devcontainer
   (Checkmk 2.5 Ultimate).
 
+### Removed
+- Unused ruleset "Veeam Backup Tasks" (`veeam_rest_tasks`): its check plugin was
+  removed earlier, so rules in it had no effect. `cmk-validate-plugins` reported it.
+
 ## [0.0.59] - 2026-10-02
 
 ### Fixed

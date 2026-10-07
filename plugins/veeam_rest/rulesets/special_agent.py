@@ -185,7 +185,8 @@ def _parameter_form() -> Dictionary:
                     help_text=Help(
                         "Fetches task sessions and restore points from the specified time range. "
                         "This affects backup metrics (size, duration) and malware scan status. "
-                        "Recommended: 24h for daily backups, 7 days for weekly, 14 days for bi-weekly. "
+                        "Recommended: 24h for daily backups, 7 days for weekly, "
+                        "14 days for bi-weekly. "
                         "Shorter values improve API performance significantly."
                     ),
                     displayed_magnitudes=[TimeMagnitude.HOUR, TimeMagnitude.DAY],
