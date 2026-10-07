@@ -11,9 +11,14 @@ All notable changes to this project will be documented in this file.
 - Development environment moved to the checkmk-plugin-template devcontainer
   (Checkmk 2.5 Ultimate).
 
+- **Veeam License:** support contract expiration now goes CRITICAL below the
+  "Support expiration critical" threshold (default 7 days) and when the support
+  contract has expired, like the license expiration. Before, it was WARNING at most.
+
 ### Removed
 - Unused ruleset "Veeam Backup Tasks" (`veeam_rest_tasks`): its check plugin was
   removed earlier, so rules in it had no effect. `cmk-validate-plugins` reported it.
+- Outdated man page of the removed `veeam_rest_tasks` check.
 
 ## [0.0.59] - 2026-10-02
 

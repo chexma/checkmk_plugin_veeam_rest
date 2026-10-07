@@ -168,12 +168,12 @@ def check_veeam_rest_license(
             )
             if support_days_left < 0:
                 yield Result(
-                    state=State.WARN,
+                    state=State.CRIT,
                     summary=f"Support contract expired {abs(support_days_left)} days ago "
                     f"{support_threshold_info}",
                 )
             elif support_days_left <= support_exp_crit:
-                yield Result(state=State.WARN, summary=support_expires)
+                yield Result(state=State.CRIT, summary=support_expires)
             elif support_days_left <= support_exp_warn:
                 yield Result(state=State.WARN, summary=support_expires)
             else:

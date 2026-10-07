@@ -18,7 +18,8 @@ description:
  - WARN: License or support contract expiring within threshold (default: 30 days)
  - WARN: Instance usage exceeds warning threshold (default: 80%)
  - CRIT: License invalid or expired
- - CRIT: License expiring within critical threshold (default: 7 days)
+ - CRIT: License or support contract expiring within critical threshold (default: 7 days)
+ - CRIT: Support contract expired
  - CRIT: Instance usage exceeds critical threshold (default: 95%)
 
  Configurable thresholds for license expiration, support expiration,

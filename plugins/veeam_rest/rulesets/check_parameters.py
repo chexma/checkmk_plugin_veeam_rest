@@ -347,8 +347,8 @@ def _veeam_rest_license_form() -> Dictionary:
                 parameter_form=Integer(
                     title=Title("Support expiration critical"),
                     help_text=Help(
-                        "Alert with WARNING if the support contract expires within this many days. "
-                        "Note: Support expiration only generates WARNING, not CRITICAL."
+                        "Alert with CRITICAL if the support contract expires within this many "
+                        "days. An expired support contract is always CRITICAL."
                     ),
                     unit_symbol="days",
                     prefill=DefaultValue(7),
