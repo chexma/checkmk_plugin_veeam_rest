@@ -21,7 +21,6 @@ from cmk.agent_based.v2 import (
 
 from cmk_addons.plugins.veeam_rest.lib import parse_json_section
 
-
 # =============================================================================
 # SECTION PARSING
 # =============================================================================
@@ -47,6 +46,7 @@ agent_section_veeam_rest_security = AgentSection(
 # DISCOVERY
 # =============================================================================
 
+
 def discover_veeam_rest_security(section: Section) -> DiscoveryResult:
     """Discover Veeam security compliance service."""
     if section is not None:
@@ -60,8 +60,8 @@ def discover_veeam_rest_security(section: Section) -> DiscoveryResult:
 # Status mapping for best practice check status
 STATUS_STATE_MAP = {
     "Passed": State.OK,
-    "Failed": State.WARN,      # Failed checks are warnings by default
-    "Suppressed": State.OK,     # Suppressed checks are OK (intentionally ignored)
+    "Failed": State.WARN,  # Failed checks are warnings by default
+    "Suppressed": State.OK,  # Suppressed checks are OK (intentionally ignored)
     "NotApplicable": State.OK,  # Not applicable checks are OK
 }
 
@@ -155,8 +155,8 @@ check_plugin_veeam_rest_security = CheckPlugin(
     discovery_function=discover_veeam_rest_security,
     check_function=check_veeam_rest_security,
     check_default_parameters={
-        "failed_warn": 1,   # Any failed check = WARN
-        "failed_crit": 5,   # 5+ failed checks = CRIT
+        "failed_warn": 1,  # Any failed check = WARN
+        "failed_crit": 5,  # 5+ failed checks = CRIT
     },
     check_ruleset_name="veeam_rest_security",
 )

@@ -18,7 +18,6 @@ from cmk.graphing.v1.metrics import (
 )
 from cmk.graphing.v1.perfometers import Closed, FocusRange, Open, Perfometer
 
-
 # =============================================================================
 # UNITS
 # =============================================================================

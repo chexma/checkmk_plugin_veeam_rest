@@ -40,9 +40,7 @@ def _parameter_form() -> Dictionary:
                 required=True,
                 parameter_form=String(
                     title=Title("Username"),
-                    help_text=Help(
-                        "Veeam admin username. Format: DOMAIN\\user or user@domain.com"
-                    ),
+                    help_text=Help("Veeam admin username. Format: DOMAIN\\user or user@domain.com"),
                 ),
             ),
             "password": DictElement(

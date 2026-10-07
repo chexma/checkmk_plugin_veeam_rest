@@ -24,7 +24,6 @@ from cmk.agent_based.v2 import (
     render,
 )
 
-
 # =============================================================================
 # SECTION PARSING
 # =============================================================================
@@ -54,6 +53,7 @@ agent_section_veeam_rest_license = AgentSection(
 # DISCOVERY
 # =============================================================================
 
+
 def discover_veeam_rest_license(section: Section) -> DiscoveryResult:
     """Discover Veeam license."""
     if section:
@@ -63,6 +63,7 @@ def discover_veeam_rest_license(section: Section) -> DiscoveryResult:
 # =============================================================================
 # HELPER FUNCTIONS
 # =============================================================================
+
 
 def _parse_datetime(date_str: str | None) -> datetime | None:
     """Parse ISO 8601 datetime string to datetime object."""
@@ -215,7 +216,9 @@ def check_veeam_rest_license(
 
             yield Metric("veeam_rest_license_instances_used", used)
             yield Metric("veeam_rest_license_instances_licensed", licensed)
-            yield Metric("veeam_rest_license_instances_usage_percent", usage_percent, boundaries=(0, 100))
+            yield Metric(
+                "veeam_rest_license_instances_usage_percent", usage_percent, boundaries=(0, 100)
+            )
 
     # Check socket license usage
     if socket_summary:
@@ -269,11 +272,11 @@ check_plugin_veeam_rest_license = CheckPlugin(
     check_function=check_veeam_rest_license,
     check_default_parameters={
         "license_expiration_warn": 30,  # days
-        "license_expiration_crit": 7,   # days
+        "license_expiration_crit": 7,  # days
         "support_expiration_warn": 30,  # days
-        "support_expiration_crit": 7,   # days
-        "instance_usage_warn": 80.0,    # percent
-        "instance_usage_crit": 95.0,    # percent
+        "support_expiration_crit": 7,  # days
+        "instance_usage_warn": 80.0,  # percent
+        "instance_usage_crit": 95.0,  # percent
     },
     check_ruleset_name="veeam_rest_license",
 )

@@ -26,7 +26,6 @@ from cmk.agent_based.v2 import (
 
 from cmk_addons.plugins.veeam_rest.lib import format_datetime
 
-
 # =============================================================================
 # SECTION PARSING
 # =============================================================================
@@ -56,6 +55,7 @@ agent_section_veeam_rest_config_backup = AgentSection(
 # DISCOVERY
 # =============================================================================
 
+
 def discover_veeam_rest_config_backup(section: Section) -> DiscoveryResult:
     """Discover Veeam configuration backup."""
     if section:
@@ -65,6 +65,7 @@ def discover_veeam_rest_config_backup(section: Section) -> DiscoveryResult:
 # =============================================================================
 # HELPER FUNCTIONS
 # =============================================================================
+
 
 def _parse_datetime(date_str: str | None) -> datetime | None:
     """Parse ISO 8601 datetime string to datetime object."""
@@ -88,6 +89,7 @@ def _calculate_age_seconds(target_date: datetime | None) -> int | None:
 # =============================================================================
 # CHECK FUNCTION
 # =============================================================================
+
 
 def check_veeam_rest_config_backup(
     params: Mapping[str, Any],
@@ -201,7 +203,7 @@ check_plugin_veeam_rest_config_backup = CheckPlugin(
     discovery_function=discover_veeam_rest_config_backup,
     check_function=check_veeam_rest_config_backup,
     check_default_parameters={
-        "backup_age_warn": 7,   # 7 days
+        "backup_age_warn": 7,  # 7 days
         "backup_age_crit": 14,  # 14 days
     },
     check_ruleset_name="veeam_rest_config_backup",

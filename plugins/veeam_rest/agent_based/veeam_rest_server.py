@@ -20,7 +20,6 @@ from cmk.agent_based.v2 import (
     StringTable,
 )
 
-
 # =============================================================================
 # SECTION PARSING
 # =============================================================================
@@ -50,6 +49,7 @@ agent_section_veeam_rest_server = AgentSection(
 # DISCOVERY
 # =============================================================================
 
+
 def discover_veeam_rest_server(section: Section) -> DiscoveryResult:
     """Discover Veeam backup server."""
     if section:
@@ -59,6 +59,7 @@ def discover_veeam_rest_server(section: Section) -> DiscoveryResult:
 # =============================================================================
 # CHECK FUNCTION
 # =============================================================================
+
 
 def check_veeam_rest_server(
     params: Mapping[str, Any],

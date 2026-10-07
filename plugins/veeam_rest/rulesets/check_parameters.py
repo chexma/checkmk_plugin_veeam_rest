@@ -22,10 +22,10 @@ from cmk.rulesets.v1.form_specs import (
 )
 from cmk.rulesets.v1.rule_specs import CheckParameters, HostAndItemCondition, HostCondition, Topic
 
-
 # =============================================================================
 # VEEAM JOBS
 # =============================================================================
+
 
 def _state_choice() -> SingleChoice:
     """Create a single choice for OK/WARN/CRIT state selection."""
@@ -70,9 +70,7 @@ def _veeam_rest_jobs_form() -> Dictionary:
                 required=False,
                 parameter_form=Dictionary(
                     title=Title("Job Result State Mapping"),
-                    help_text=Help(
-                        "Configure the monitoring state for each possible job result."
-                    ),
+                    help_text=Help("Configure the monitoring state for each possible job result."),
                     elements={
                         "Success": DictElement(
                             required=False,
@@ -238,6 +236,7 @@ rule_spec_veeam_rest_jobs = CheckParameters(
 # VEEAM TASKS
 # =============================================================================
 
+
 def _veeam_rest_tasks_form() -> Dictionary:
     return Dictionary(
         title=Title("Veeam Backup Task Parameters"),
@@ -259,8 +258,7 @@ def _veeam_rest_tasks_form() -> Dictionary:
                 parameter_form=Integer(
                     title=Title("Maximum backup duration"),
                     help_text=Help(
-                        "Alert if the backup took longer than this threshold. "
-                        "Value in hours."
+                        "Alert if the backup took longer than this threshold. " "Value in hours."
                     ),
                     unit_symbol="hours",
                     prefill=DefaultValue(8),
@@ -283,6 +281,7 @@ rule_spec_veeam_rest_tasks = CheckParameters(
 # VEEAM REPOSITORIES
 # =============================================================================
 
+
 def _veeam_rest_repositories_form() -> Dictionary:
     return Dictionary(
         title=Title("Veeam Repository Parameters"),
@@ -303,9 +302,7 @@ def _veeam_rest_repositories_form() -> Dictionary:
                 required=False,
                 parameter_form=SimpleLevels(
                     title=Title("Minimum free space"),
-                    help_text=Help(
-                        "Set warning and critical thresholds for minimum free space."
-                    ),
+                    help_text=Help("Set warning and critical thresholds for minimum free space."),
                     level_direction=LevelDirection.LOWER,
                     form_spec_template=DataSize(
                         displayed_magnitudes=[IECMagnitude.GIBI],
@@ -330,6 +327,7 @@ rule_spec_veeam_rest_repositories = CheckParameters(
 # VEEAM PROXIES
 # =============================================================================
 
+
 def _veeam_rest_proxies_form() -> Dictionary:
     return Dictionary(
         title=Title("Veeam Proxy Parameters"),
@@ -350,6 +348,7 @@ rule_spec_veeam_rest_proxies = CheckParameters(
 # =============================================================================
 # VEEAM LICENSE
 # =============================================================================
+
 
 def _veeam_rest_license_form() -> Dictionary:
     return Dictionary(
@@ -439,6 +438,7 @@ rule_spec_veeam_rest_license = CheckParameters(
 # VEEAM SERVER
 # =============================================================================
 
+
 def _veeam_rest_server_form() -> Dictionary:
     return Dictionary(
         title=Title("Veeam Server Parameters"),
@@ -459,6 +459,7 @@ rule_spec_veeam_rest_server = CheckParameters(
 # =============================================================================
 # VEEAM SCALE-OUT REPOSITORIES
 # =============================================================================
+
 
 def _veeam_rest_scaleout_repositories_form() -> Dictionary:
     return Dictionary(
@@ -481,6 +482,7 @@ rule_spec_veeam_rest_scaleout_repositories = CheckParameters(
 # VEEAM WAN ACCELERATORS
 # =============================================================================
 
+
 def _veeam_rest_wan_accelerators_form() -> Dictionary:
     return Dictionary(
         title=Title("Veeam WAN Accelerator Parameters"),
@@ -501,6 +503,7 @@ rule_spec_veeam_rest_wan_accelerators = CheckParameters(
 # =============================================================================
 # SHARED ELEMENTS FOR VM/BACKUP OBJECT CHECKS
 # =============================================================================
+
 
 def _malware_status_elements() -> dict:
     """Shared malware status configuration elements for VM backup checks."""
@@ -571,6 +574,7 @@ def _malware_status_elements() -> dict:
 # =============================================================================
 # VEEAM BACKUP (UNIFIED - Piggyback and Server Services)
 # =============================================================================
+
 
 def _veeam_rest_backup_form() -> Dictionary:
     return Dictionary(
@@ -656,6 +660,7 @@ rule_spec_veeam_rest_backup = CheckParameters(
 # VEEAM CONFIGURATION BACKUP
 # =============================================================================
 
+
 def _veeam_rest_config_backup_form() -> Dictionary:
     return Dictionary(
         title=Title("Veeam Configuration Backup Parameters"),
@@ -720,12 +725,11 @@ rule_spec_veeam_rest_config_backup = CheckParameters(
 # VEEAM SECURITY COMPLIANCE
 # =============================================================================
 
+
 def _veeam_rest_security_form() -> Dictionary:
     return Dictionary(
         title=Title("Veeam Security Compliance Parameters"),
-        help_text=Help(
-            "Configure thresholds for security best practice violations."
-        ),
+        help_text=Help("Configure thresholds for security best practice violations."),
         elements={
             "failed_warn": DictElement(
                 required=False,

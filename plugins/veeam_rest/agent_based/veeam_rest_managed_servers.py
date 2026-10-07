@@ -20,7 +20,6 @@ from cmk.agent_based.v2 import (
 
 from cmk_addons.plugins.veeam_rest.lib import parse_json_section
 
-
 # =============================================================================
 # SECTION PARSING
 # =============================================================================
@@ -45,6 +44,7 @@ agent_section_veeam_rest_managed_servers = AgentSection(
 # =============================================================================
 # DISCOVERY
 # =============================================================================
+
 
 def discover_veeam_rest_managed_servers(section: Section) -> DiscoveryResult:
     """Discover managed servers."""
@@ -146,9 +146,7 @@ def check_veeam_rest_managed_servers(
         # List active components
         components = network_settings.get("components", [])
         active_components = [
-            f"{c['componentName']}:{c['port']}"
-            for c in components
-            if c.get("port", -1) > 0
+            f"{c['componentName']}:{c['port']}" for c in components if c.get("port", -1) > 0
         ]
         if active_components:
             yield Result(state=State.OK, notice=f"Components: {', '.join(active_components)}")

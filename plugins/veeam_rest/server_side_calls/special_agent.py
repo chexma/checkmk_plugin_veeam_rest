@@ -9,10 +9,10 @@ for the special agent executable.
 from collections.abc import Iterator
 
 from cmk.server_side_calls.v1 import (
-    noop_parser,
-    SpecialAgentConfig,
-    SpecialAgentCommand,
     HostConfig,
+    SpecialAgentCommand,
+    SpecialAgentConfig,
+    noop_parser,
 )
 
 
@@ -64,7 +64,6 @@ def _agent_arguments(
     # Session age filter
     if "session_age" in params:
         args.extend(["--session-age", str(int(params["session_age"]))])
-
 
     # Caching options
     if params.get("no_cache", False):

@@ -49,9 +49,7 @@ def _parameter_form() -> Dictionary:
                 required=True,
                 parameter_form=String(
                     title=Title("Username"),
-                    help_text=Help(
-                        "Veeam admin username. Format: DOMAIN\\user or user@domain.com"
-                    ),
+                    help_text=Help("Veeam admin username. Format: DOMAIN\\user or user@domain.com"),
                 ),
             ),
             "password": DictElement(
@@ -138,19 +136,21 @@ def _parameter_form() -> Dictionary:
                             title=Title("Security Compliance"),
                         ),
                     ],
-                    prefill=DefaultValue([
-                        "jobs",
-                        "repositories",
-                        "proxies",
-                        "managed_servers",
-                        "license",
-                        "server",
-                        "scaleout_repositories",
-                        "wan_accelerators",
-                        "replicas",
-                        "config_backup",
-                        "security",
-                    ]),
+                    prefill=DefaultValue(
+                        [
+                            "jobs",
+                            "repositories",
+                            "proxies",
+                            "managed_servers",
+                            "license",
+                            "server",
+                            "scaleout_repositories",
+                            "wan_accelerators",
+                            "replicas",
+                            "config_backup",
+                            "security",
+                        ]
+                    ),
                 ),
             ),
             # Service output options

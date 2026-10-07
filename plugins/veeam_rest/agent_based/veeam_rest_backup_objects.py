@@ -22,7 +22,6 @@ from cmk.agent_based.v2 import (
 
 from cmk_addons.plugins.veeam_rest.lib import parse_json_section, yield_backup_metrics
 
-
 # =============================================================================
 # SECTION PARSING
 # =============================================================================
@@ -47,6 +46,7 @@ agent_section_veeam_rest_backup_objects = AgentSection(
 # =============================================================================
 # DISCOVERY
 # =============================================================================
+
 
 def discover_veeam_rest_backup_objects(section: Section) -> DiscoveryResult:
     """Discover one service per backup object."""

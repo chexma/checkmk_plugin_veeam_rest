@@ -27,7 +27,6 @@ from cmk_addons.plugins.veeam_rest.lib import (
     parse_rate_to_bytes_per_second,
 )
 
-
 # =============================================================================
 # SECTION PARSING
 # =============================================================================
@@ -114,6 +113,7 @@ def _get_job_category(job: dict[str, Any]) -> str:
 # =============================================================================
 # DISCOVERY
 # =============================================================================
+
 
 def discover_veeam_rest_jobs(section: Section) -> DiscoveryResult:
     """Discover backup jobs."""

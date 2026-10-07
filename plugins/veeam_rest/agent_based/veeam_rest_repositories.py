@@ -23,7 +23,6 @@ from cmk.agent_based.v2 import (
 
 from cmk_addons.plugins.veeam_rest.lib import parse_json_section
 
-
 # =============================================================================
 # SECTION PARSING
 # =============================================================================
@@ -122,6 +121,7 @@ def _get_repo_category(repo: dict[str, Any]) -> str:
 # DISCOVERY
 # =============================================================================
 
+
 def discover_veeam_rest_repositories(section: Section) -> DiscoveryResult:
     """Discover backup repositories."""
     if not section:
@@ -134,6 +134,7 @@ def discover_veeam_rest_repositories(section: Section) -> DiscoveryResult:
 # =============================================================================
 # CHECK FUNCTION
 # =============================================================================
+
 
 def check_veeam_rest_repositories(
     item: str,
