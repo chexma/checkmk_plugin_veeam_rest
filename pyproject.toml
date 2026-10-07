@@ -1,0 +1,13 @@
+# Tool configuration only; this repo is not an installable Python package.
+
+[tool.black]
+line-length = 100
+
+[tool.isort]
+profile = "black"
+line_length = 100
+known_first_party = ["cmk_addons"]
+known_third_party = ["cmk", "pydantic", "requests"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

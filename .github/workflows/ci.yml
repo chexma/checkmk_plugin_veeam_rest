@@ -1,0 +1,78 @@
+# Lint, test and validate in the same image as the devcontainer; on a tag
+# v<version> also build the MKP and attach it to a GitHub release.
+#
+# Release: bump 'version' in ./package, commit, then
+#   git tag v<version> && git push origin v<version>
+name: CI
+
+on:
+  push:
+    # master: repos created before the switch to main
+    branches: [main, master]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    # Only in plugin repos cloned from the template, not in the template itself
+    if: github.repository != 'chexma/checkmk-plugin-template'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the release on tags
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read Checkmk edition and version from devcontainer.json
+        id: cmk
+        run: |
+          arg() { sed -nE "s/^[[:space:]]*\"$1\":[[:space:]]*\"([^\"]+)\".*/\1/p" .devcontainer/devcontainer.json | head -1; }
+          echo "edition=$(arg EDITION)" >> "$GITHUB_OUTPUT"
+          echo "variant=$(arg VARIANT)" >> "$GITHUB_OUTPUT"
+
+      - name: Build devcontainer image
+        run: |
+          docker build --platform=linux/amd64 \
+            --build-arg EDITION=${{ steps.cmk.outputs.edition }} \
+            --build-arg VARIANT=${{ steps.cmk.outputs.variant }} \
+            -t plugin-dev .devcontainer
+
+      - name: Check tag matches package version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          version=$(python3 -c "import ast; print(ast.literal_eval(open('package').read())['version'])")
+          if [[ "v$version" != "$GITHUB_REF_NAME" ]]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match version $version in ./package"
+            exit 1
+          fi
+
+      - name: Lint, test, validate${{ startsWith(github.ref, 'refs/tags/v') && ', build MKP' || '' }}
+        run: |
+          mkdir -p plugins lib bin agents plugins_legacy nagios_plugins temp tests
+          # The site user in the container must be able to write test/build output.
+          chmod -R a+rwX .
+          W=/workspaces/plugin
+          S=/opt/omd/sites/cmk
+          # Same mounts as devcontainer.json
+          docker run --rm --platform=linux/amd64 -u cmk -w $W -e WORKSPACE=$W \
+            -v "$PWD:$W" \
+            -v "$PWD/lib:$S/local/lib/python3/cmk" \
+            -v "$PWD/plugins:$S/local/lib/python3/cmk_addons/plugins" \
+            -v "$PWD/plugins_legacy:$S/local/share/check_mk" \
+            -v "$PWD/bin:$S/local/bin" \
+            -v "$PWD/agents:$S/local/share/check_mk/agents" \
+            -v "$PWD/nagios_plugins:$S/local/lib/nagios/plugins" \
+            plugin-dev -c "
+              bash .devcontainer/ci.sh ${{ startsWith(github.ref, 'refs/tags/v') && '--build' || '' }}"
+
+      - name: Create release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # The site's umask makes the .mkp readable for the site user only
+          sudo chmod a+r ./*.mkp
+          gh release create "$GITHUB_REF_NAME" ./*.mkp --title "$GITHUB_REF_NAME" --generate-notes

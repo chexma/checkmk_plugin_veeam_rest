@@ -1,0 +1,6 @@
+# Formatters and linters, installed into a separate venv (see Dockerfile):
+# they only read source files and never import Checkmk code.
+# Pinned so every plugin container and CI format identically; bump on purpose.
+black==26.10.0
+isort==9.0.2
+flake8==7.4.1

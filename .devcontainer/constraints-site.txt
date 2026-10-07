@@ -1,0 +1,7 @@
+# Versions for dependencies of requirements-site.txt, used only when the
+# Checkmk version does not ship them (e.g. 2.5 has no pytest; 2.4 ships
+# pytest 8.3.4, pluggy 1.6.0, iniconfig 2.3.0, which then stay in use).
+coverage==7.16.2
+pytest==8.3.4
+pluggy==1.6.0
+iniconfig==2.3.0

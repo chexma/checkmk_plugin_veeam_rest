@@ -1,0 +1,47 @@
+{
+  "extraKnownMarketplaces": {
+    "chexma-checkmk": {
+      "source": {
+        "source": "github",
+        "repo": "chexma/claude_code_checkmk_plugin_skill"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "checkmk-plugin-dev@chexma-checkmk": true
+  },
+  "permissions": {
+    "allow": [
+      "Bash(pytest *)",
+      "Bash(black *)",
+      "Bash(isort *)",
+      "Bash(flake8 *)",
+      "Bash(cmk-validate-plugins *)",
+      "Bash(cmk -v *)",
+      "Bash(cmk -vI *)",
+      "Bash(cmk -d *)",
+      "Bash(.devcontainer/ci.sh *)",
+      "Bash(bash .devcontainer/ci.sh *)",
+      "Bash(.devcontainer/test-host.sh *)",
+      "Bash(bash .devcontainer/test-host.sh *)"
+    ],
+    "deny": [
+      "Bash(mkp release *)",
+      "Bash(mkp disable *)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/format-python.sh",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

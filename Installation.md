@@ -13,7 +13,7 @@
 
 ## Step 1: Download the Plugin
 
-Download the latest MKP file from the [GitHub](https://github.com/chexma/checkmk_plugin_veeam_rest/) page.
+Download the latest MKP file from the [GitHub releases](https://github.com/chexma/checkmk_plugin_veeam_rest/releases/latest) page.
 
 Or copy the MKP file directly to your Checkmk server:
 

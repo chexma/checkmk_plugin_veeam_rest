@@ -21,6 +21,8 @@ Checkmk 2.4 plugin for monitoring Veeam Backup & Replication (Version 13 and abo
 
 ## Installation
 
+Download the latest MKP from the [releases page](https://github.com/chexma/checkmk_plugin_veeam_rest/releases/latest).
+
 See [Installation Guide](Installation.md) for detailed setup instructions including Veeam user configuration and troubleshooting.
 
 ## Services Created

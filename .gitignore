@@ -1,0 +1,33 @@
+# Claude Code: only shared project settings are tracked. Login, history and
+# memory live in the "checkmk-claude-config" Docker volume, not here; the
+# patterns below are a safety net in case something lands here anyway.
+/.claude/*
+!/.claude/settings.json
+!/.claude/hooks/
+# Plugin-specific Claude instructions stay private (see README)
+CLAUDE.local.md
+
+# Scratch space (test data, agent output; not linked into the site)
+/temp/
+
+# mkp keeps enabled packages in local/share/check_mk, i.e. plugins_legacy/
+/plugins_legacy/enabled_packages/
+
+# Python / tooling
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+htmlcov/
+
+# OS cruft
+.DS_Store
+
+# Built MKPs (.devcontainer/build.sh copies them here; CI attaches them to releases)
+/*.mkp
+
+# veeam_rest: local reference material and editor settings (not tracked)
+/swagger.json
+/plans/
+/.vscode/
+/debug.log

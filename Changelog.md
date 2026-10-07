@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Changed
+- MKP packages are now published as GitHub releases
+  (https://github.com/chexma/checkmk_plugin_veeam_rest/releases) instead of being
+  committed to the repository root.
+- Development environment moved to the checkmk-plugin-template devcontainer
+  (Checkmk 2.5 Ultimate).
+
 ## [0.0.59] - 2026-10-02
 
 ### Fixed

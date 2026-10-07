@@ -1,0 +1,5 @@
+# Test helpers, installed into the site Python (local/lib/python3) by
+# install-site-requirements.py: with --no-deps, plus only those dependencies
+# this Checkmk version does not ship (pinned in constraints-site.txt).
+pytest-cov==7.1.0
+requests-mock==1.12.1

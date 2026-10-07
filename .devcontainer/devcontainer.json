@@ -1,0 +1,90 @@
+{
+    "name": "Checkmk plugin dev (${localWorkspaceFolderBasename})",
+    "build": {
+        "dockerfile": "Dockerfile",
+        "args": {
+            // Per plugin: pick the Checkmk edition and version to develop against.
+            // EDITION (image checkmk/check-mk-<EDITION>):
+            //   2.4: raw | enterprise | cloud
+            //   2.5: community | pro | ultimate | ultimatemt (cloud -> ultimate)
+            "EDITION": "ultimate",
+            "VARIANT": "2.5.0p15",
+            "CLAUDE_CODE_VERSION": "latest"
+        },
+        // Checkmk images exist for amd64 only; on Apple Silicon they run
+        // emulated (enable Rosetta in Docker Desktop for speed).
+        "options": ["--platform=linux/amd64"]
+    },
+    "init": true,
+
+    // Runs on the host before the container is created: bind mounts fail if
+    // their source directory is missing.
+    "initializeCommand": "mkdir -p plugins lib bin agents plugins_legacy nagios_plugins temp tests",
+
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-python.python",
+                "ms-python.flake8",
+                "ms-python.isort",
+                "ms-python.black-formatter",
+                "anthropic.claude-code"
+            ],
+            "settings": {
+                "terminal.integrated.defaultProfile.linux": "bash",
+                "python.defaultInterpreterPath": "/omd/sites/cmk/bin/python3",
+                "python.testing.pytestEnabled": true,
+                // Use the pinned tools from the image (requirements-tools.txt)
+                // instead of the versions bundled with the extensions, so
+                // format-on-save, the terminal and CI agree.
+                "black-formatter.path": ["/omd/sites/cmk/.local/bin/black"],
+                "isort.path": ["/omd/sites/cmk/.local/bin/isort"],
+                "flake8.path": ["/omd/sites/cmk/.local/bin/flake8"],
+                "[python]": {
+                    "editor.defaultFormatter": "ms-python.black-formatter"
+                }
+            }
+        }
+    },
+
+    "mounts": [
+        { "source": "${localWorkspaceFolder}/lib", "target": "/opt/omd/sites/cmk/local/lib/python3/cmk", "type": "bind" },
+        { "source": "${localWorkspaceFolder}/plugins", "target": "/opt/omd/sites/cmk/local/lib/python3/cmk_addons/plugins", "type": "bind" },
+        { "source": "${localWorkspaceFolder}/plugins_legacy", "target": "/opt/omd/sites/cmk/local/share/check_mk", "type": "bind" },
+        { "source": "${localWorkspaceFolder}/bin", "target": "/opt/omd/sites/cmk/local/bin", "type": "bind" },
+        { "source": "${localWorkspaceFolder}/agents", "target": "/opt/omd/sites/cmk/local/share/check_mk/agents", "type": "bind" },
+        // Bind mounts, not symlinks: since 2.5 every config generation copies
+        // ~/local into a snapshot and fails on symlinks to directories outside it.
+        { "source": "${localWorkspaceFolder}/nagios_plugins", "target": "/opt/omd/sites/cmk/local/lib/nagios/plugins", "type": "bind" },
+        // Claude Code config, login and memory: one named volume shared by all
+        // plugin projects (log in once, survives rebuilds, never in the repo).
+        { "source": "checkmk-claude-config", "target": "/opt/omd/sites/cmk/.claude", "type": "volume" }
+    ],
+
+    "postCreateCommand": "bash .devcontainer/post-create.sh",
+    "postStartCommand": "bash -lc 'bash .devcontainer/startup.sh </dev/null >/omd/sites/cmk/var/log/devcontainer-poststart.log 2>&1'",
+
+    "remoteUser": "cmk",
+    "userEnvProbe": "loginShell",
+
+    // Checkmk GUI: VS Code forwards it to a free local port (see the Ports
+    // view), so several plugin containers can run side by side.
+    "forwardPorts": [5000],
+    "portsAttributes": {
+        "5000": { "label": "Checkmk GUI (/cmk/, cmkadmin/cmkadmin)", "onAutoForward": "notify" }
+    },
+
+    "runArgs": ["--platform=linux/amd64"],
+
+    // containerEnv (not remoteEnv) so it also applies to `docker exec` shells
+    // and lifecycle scripts.
+    "containerEnv": {
+        "CLAUDE_CONFIG_DIR": "/opt/omd/sites/cmk/.claude",
+        "WORKSPACE": "${containerWorkspaceFolder}"
+    },
+    "remoteEnv": {
+        "PATH": "/omd/sites/cmk/bin:/omd/sites/cmk/local/lib/python3/bin:${containerEnv:PATH}",
+        "OMD_ROOT": "/omd/sites/cmk",
+        "OMD_SITE": "cmk"
+    }
+}

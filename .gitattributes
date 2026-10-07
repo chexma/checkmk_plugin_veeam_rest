@@ -1,0 +1,7 @@
+# Scripts run inside the Linux container: keep LF even on Windows checkouts
+*.sh                text eol=lf
+Dockerfile          text eol=lf
+**/libexec/*        text eol=lf
+bin/*               text eol=lf
+nagios_plugins/*    text eol=lf
+*.mkp               binary
